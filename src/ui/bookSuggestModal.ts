@@ -8,6 +8,8 @@ export interface BookItem {
     fileHref: string;
     bookName: string;
     notes: MoonReaderNote[];
+    lastModified?: string;
+    contentLength?: number;
 }
 
 export class BookSuggestModal extends SuggestModal<BookItem> {
