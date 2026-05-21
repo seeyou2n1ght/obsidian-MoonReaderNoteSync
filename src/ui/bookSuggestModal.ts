@@ -1,12 +1,13 @@
 import { App, SuggestModal, Notice, setIcon } from 'obsidian';
 import MoonReaderSyncPlugin from '../main';
-import { WebDAVFile } from '../utils/webdav';
+import { MoonReaderNote, AnParser } from '../utils/anParser';
 import { TemplateModal } from './templateModal';
 import { FileSuggestModal } from './fileSuggestModal';
 
 export interface BookItem {
-    file: WebDAVFile;
+    fileHref: string;
     bookName: string;
+    notes: MoonReaderNote[];
 }
 
 export class BookSuggestModal extends SuggestModal<BookItem> {

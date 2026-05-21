@@ -18,15 +18,28 @@ export default class MoonReaderSyncPlugin extends Plugin {
 
         this.addSettingTab(new MoonReaderWebDAVSettingTab(this.app, this));
 
-        this.addRibbonIcon('cloud-download', 'Pull MoonReader Notes', () => {
+        this.addRibbonIcon('cloud-download', 'Sync WebDAV Notes', () => {
             this.pullNotesCommand();
         });
 
         this.addCommand({
             id: 'pull-moonreader-notes',
-            name: 'Pull Notes from WebDAV',
+            name: 'Sync Notes from WebDAV (Network)',
             callback: () => {
                 this.pullNotesCommand();
+            }
+        });
+
+        this.addCommand({
+            id: 'open-moonreader-cache',
+            name: 'Select Book from Local Cache',
+            callback: async () => {
+                const books = await this.loadCache();
+                if (books.length === 0) {
+                    new Notice("Local cache is empty. Please Sync from WebDAV first.");
+                    return;
+                }
+                new BookSuggestModal(this.app, this, books).open();
             }
         });
     }
@@ -39,13 +52,31 @@ export default class MoonReaderSyncPlugin extends Plugin {
         await this.saveData(this.settings);
     }
 
+    async loadCache(): Promise<BookItem[]> {
+        const cachePath = this.manifest.dir + '/moonreader_cache.json';
+        if (await this.app.vault.adapter.exists(cachePath)) {
+            const data = await this.app.vault.adapter.read(cachePath);
+            try {
+                return JSON.parse(data);
+            } catch (e) {
+                return [];
+            }
+        }
+        return [];
+    }
+
+    async saveCache(books: BookItem[]) {
+        const cachePath = this.manifest.dir + '/moonreader_cache.json';
+        await this.app.vault.adapter.write(cachePath, JSON.stringify(books));
+    }
+
     async pullNotesCommand() {
         if (!this.settings.webDavUrl || !this.settings.username || !this.settings.encryptedPass || !this.settings.keyFilePath) {
             new Notice("Please configure WebDAV settings and local key first.");
             return;
         }
 
-        new Notice("Connecting to WebDAV and parsing books...");
+        new Notice("Connecting to WebDAV and pulling all notes...");
         const client = new WebDAVClient(this.settings.webDavUrl, this.settings.username, this.settings.encryptedPass, this.settings.keyFilePath);
         
         try {
@@ -61,10 +92,11 @@ export default class MoonReaderSyncPlugin extends Plugin {
             for (const file of anFiles) {
                 try {
                     const buf = await client.getFileBuffer(file.href);
-                    const bookName = AnParser.parseBookNameOnly(buf) || file.href.split('/').pop() || "Unknown Book";
-                    books.push({ file, bookName });
+                    const parsedNotes = AnParser.parseBuffer(buf);
+                    const bookName = parsedNotes.length > 0 ? parsedNotes[0].bookName : (file.href.split('/').pop() || "Unknown Book");
+                    books.push({ fileHref: file.href, bookName, notes: parsedNotes });
                 } catch(e) {
-                    console.error("Failed to parse book name for", file.href, e);
+                    console.error("Failed to parse", file.href, e);
                 }
             }
 
@@ -73,18 +105,14 @@ export default class MoonReaderSyncPlugin extends Plugin {
                 return;
             }
 
+            await this.saveCache(books);
+            new Notice(`Successfully synced and cached ${books.length} books!`);
             new BookSuggestModal(this.app, this, books).open();
 
         } catch (e) {
             console.error("Pull notes failed", e);
             new Notice("Failed to pull notes. Check console for details.");
         }
-    }
-
-    async getNotesFromWebDAV(item: BookItem): Promise<MoonReaderNote[]> {
-        const client = new WebDAVClient(this.settings.webDavUrl, this.settings.username, this.settings.encryptedPass, this.settings.keyFilePath);
-        const buf = await client.getFileBuffer(item.file.href);
-        return AnParser.parseBuffer(buf);
     }
 
     renderNotes(notes: MoonReaderNote[], template: string): string {
@@ -104,15 +132,13 @@ export default class MoonReaderSyncPlugin extends Plugin {
     }
 
     async getPreviewText(item: BookItem): Promise<string> {
-        const notes = await this.getNotesFromWebDAV(item);
-        const previewNotes = notes.slice(0, 3);
+        const previewNotes = item.notes.slice(0, 3);
         return this.renderNotes(previewNotes, this.settings.noteTemplate);
     }
 
     async importBookToCursor(item: BookItem, template: string) {
         new Notice(`Importing ${item.bookName}...`);
-        const notes = await this.getNotesFromWebDAV(item);
-        const text = this.renderNotes(notes, template);
+        const text = this.renderNotes(item.notes, template);
         
         const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (activeView) {
@@ -126,8 +152,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
 
     async importBookToFile(item: BookItem, template: string, file: TFile) {
         new Notice(`Importing ${item.bookName} to ${file.basename}...`);
-        const notes = await this.getNotesFromWebDAV(item);
-        const textToInsert = this.renderNotes(notes, template);
+        const textToInsert = this.renderNotes(item.notes, template);
         
         const content = await this.app.vault.read(file);
         
