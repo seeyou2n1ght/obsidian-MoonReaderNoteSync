@@ -15,34 +15,38 @@ export class AnParser {
         const str = this.inflateBuffer(buffer);
         const lines = str.split(/\r?\n/);
         
-        let headerIndex = -1;
-        // 使用特征扫描：一条记录有17行，其中第0,4,6,8,9行必须是纯数字（可能包含负号）
-        for (let i = 0; i <= lines.length - 17; i++) {
-            const isNum = (offset: number) => /^-?\d+$/.test(lines[i + offset].trim());
-            if (isNum(0) && isNum(4) && isNum(6) && isNum(8) && isNum(9)) {
-                headerIndex = i;
+        let headerIndex = 0;
+        for (let i = 0; i < Math.min(15, lines.length); i++) {
+            if (lines[i].trim() === '#') {
+                headerIndex = i + 1;
                 break;
             }
         }
 
         const notes: MoonReaderNote[] = [];
-        if (headerIndex === -1) return notes;
-
         let idx = headerIndex;
+
         while (idx + 16 < lines.length) {
             const block = lines.slice(idx, idx + 17).map(l => l.trim());
             
             try {
-                const annId = block[0];
+                const annId = parseInt(block[0], 10);
                 const bookName = block[1];
-                const chapter = block[4];
+                const chapter = parseInt(block[4], 10);
+                const offset = parseInt(block[6], 10);
+                const length = parseInt(block[7], 10);
                 const colorInt = parseInt(block[8], 10);
                 const tsMs = parseInt(block[9], 10);
+                
+                if (isNaN(annId) || isNaN(chapter) || isNaN(offset) || isNaN(length) || isNaN(colorInt) || isNaN(tsMs)) {
+                    throw new Error("Invalid numeric field");
+                }
+
                 const note = block[11];
                 const highlightText = block[12];
                 
                 let timestamp = "";
-                if (!isNaN(tsMs) && tsMs > 0) {
+                if (tsMs > 0) {
                     const date = new Date(tsMs);
                     timestamp = date.toISOString().replace('T', ' ').substring(0, 19);
                 }
@@ -50,16 +54,16 @@ export class AnParser {
                 if (highlightText || note) {
                     notes.push({
                         bookName: bookName || "Unknown",
-                        chapter: chapter,
+                        chapter: chapter.toString(),
                         highlightText: highlightText,
                         note: note,
-                        colorHex: isNaN(colorInt) ? "#000000" : AnParser.argbToHex(colorInt.toString()),
+                        colorHex: AnParser.argbToHex(colorInt.toString()),
                         timestamp: timestamp,
-                        id: annId
+                        id: annId.toString()
                     });
                 }
             } catch (e) {
-                // Ignore parsing errors for individual blocks
+                // Defensive block skipping: isolates corrupted blocks
             }
             
             idx += 17;
