@@ -1,4 +1,14 @@
-import * as fs from 'fs';
+import { Platform, App, DataAdapter } from 'obsidian';
+
+declare var require: any;
+let fsModule: any = null;
+if (!Platform.isMobile) {
+    try {
+        fsModule = require('fs');
+    } catch (e) {
+        console.warn("Node fs module load error:", e);
+    }
+}
 
 function bufferToBase64(buf: ArrayBuffer): string {
     return Buffer.from(buf).toString('base64');
@@ -10,10 +20,48 @@ function base64ToBuffer(b64: string): ArrayBuffer {
 }
 
 export class CryptoHelper {
+    private static adapter: DataAdapter | null = null;
+
+    public static init(app: App) {
+        this.adapter = app.vault.adapter;
+    }
+
+    private static async fileExists(path: string): Promise<boolean> {
+        if (!Platform.isMobile && fsModule) {
+            return fsModule.existsSync(path);
+        }
+        if (this.adapter) {
+            return await this.adapter.exists(path);
+        }
+        return false;
+    }
+
+    private static async readFile(path: string): Promise<string> {
+        if (!Platform.isMobile && fsModule) {
+            return fsModule.readFileSync(path, 'utf8');
+        }
+        if (this.adapter) {
+            return await this.adapter.read(path);
+        }
+        throw new Error("No available file storage adapter found");
+    }
+
+    private static async writeFile(path: string, content: string): Promise<void> {
+        if (!Platform.isMobile && fsModule) {
+            fsModule.writeFileSync(path, content, 'utf8');
+            return;
+        }
+        if (this.adapter) {
+            await this.adapter.write(path, content);
+            return;
+        }
+        throw new Error("No available file storage adapter found");
+    }
+
     private static async getRawKey(keyPath: string): Promise<CryptoKey | null> {
-        if (!keyPath || !fs.existsSync(keyPath)) return null;
+        if (!keyPath || !(await this.fileExists(keyPath))) return null;
         try {
-            const keyBase64 = fs.readFileSync(keyPath, 'utf8');
+            const keyBase64 = await this.readFile(keyPath);
             const keyBuffer = base64ToBuffer(keyBase64);
             return await window.crypto.subtle.importKey(
                 "raw",
@@ -37,7 +85,7 @@ export class CryptoHelper {
             );
             const exportedKey = await window.crypto.subtle.exportKey("raw", key);
             const keyBase64 = bufferToBase64(exportedKey);
-            fs.writeFileSync(keyPath, keyBase64, 'utf8');
+            await this.writeFile(keyPath, keyBase64);
             return true;
         } catch (e) {
             console.error("Failed to generate and save key", e);

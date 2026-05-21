@@ -4,15 +4,13 @@ import { MoonReaderWebDAVSettingTab } from './ui/settingTab';
 import { WebDAVClient } from './utils/webdav';
 import { AnParser, MoonReaderNote } from './utils/anParser';
 import { BookSuggestModal, BookItem } from './ui/bookSuggestModal';
+import { CryptoHelper } from './utils/crypto';
 
 export default class MoonReaderSyncPlugin extends Plugin {
     settings: MoonReaderSyncSettings;
 
     async onload() {
-        if (Platform.isMobile) {
-            console.log("MoonReader WebDAV Sync Plugin is disabled on mobile devices.");
-            return;
-        }
+        CryptoHelper.init(this.app);
         
         await this.loadSettings();
 
@@ -140,17 +138,27 @@ export default class MoonReaderSyncPlugin extends Plugin {
         new BookSuggestModal(this.app, this, books).open();
     }
 
+function escapeHtml(text: string): string {
+    if (!text) return "";
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
     renderNotes(notes: MoonReaderNote[], template: string): string {
         let result = "";
         for (const note of notes) {
             let rendered = template;
-            rendered = rendered.replace(/{bookName}/g, note.bookName);
-            rendered = rendered.replace(/{chapter}/g, note.chapter);
-            rendered = rendered.replace(/{highlightText}/g, note.highlightText);
-            rendered = rendered.replace(/{note}/g, note.note);
-            rendered = rendered.replace(/{color}/g, note.colorHex);
-            rendered = rendered.replace(/{timestamp}/g, note.timestamp);
-            rendered = rendered.replace(/{id}/g, note.id);
+            rendered = rendered.replace(/{bookName}/g, escapeHtml(note.bookName));
+            rendered = rendered.replace(/{chapter}/g, escapeHtml(note.chapter));
+            rendered = rendered.replace(/{highlightText}/g, escapeHtml(note.highlightText));
+            rendered = rendered.replace(/{note}/g, escapeHtml(note.note));
+            rendered = rendered.replace(/{color}/g, escapeHtml(note.colorHex));
+            rendered = rendered.replace(/{timestamp}/g, escapeHtml(note.timestamp));
+            rendered = rendered.replace(/{id}/g, escapeHtml(note.id));
             result += rendered;
         }
         return result;
