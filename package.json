@@ -1,0 +1,23 @@
+{
+  "name": "ob-moonreadernotesync",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/pako": "^2.0.4",
+    "esbuild": "^0.28.0",
+    "obsidian": "^1.12.3",
+    "pako": "^2.1.0",
+    "tslib": "^2.8.1",
+    "typescript": "^6.0.3"
+  }
+}
