@@ -2,6 +2,7 @@ import { App, Modal, Setting, ButtonComponent } from 'obsidian';
 import MoonReaderSyncPlugin from '../main';
 import { BookItem } from './bookSuggestModal';
 import { FileSuggestModal } from './fileSuggestModal';
+import { TemplateBuilderUI } from './templateBuilder';
 
 export class TemplateModal extends Modal {
     plugin: MoonReaderSyncPlugin;
@@ -19,16 +20,15 @@ export class TemplateModal extends Modal {
         const {contentEl} = this;
         contentEl.createEl('h2', {text: `Adjust Template for ${this.bookItem.bookName}`});
 
-        new Setting(contentEl)
-            .setName('Template')
-            .addTextArea(text => {
-                text.inputEl.rows = 10;
-                text.inputEl.cols = 50;
-                text.setValue(this.currentTemplate)
-                    .onChange(value => {
-                        this.currentTemplate = value;
-                    });
-            });
+        TemplateBuilderUI.build(
+            contentEl,
+            this.app,
+            this.plugin,
+            this.currentTemplate,
+            (value) => {
+                this.currentTemplate = value;
+            }
+        );
 
         const btnContainer = contentEl.createDiv();
         btnContainer.style.display = "flex";

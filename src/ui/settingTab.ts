@@ -1,6 +1,7 @@
 import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import MoonReaderSyncPlugin from '../main';
 import { CryptoHelper } from '../utils/crypto';
+import { TemplateBuilderUI } from './templateBuilder';
 
 export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
     plugin: MoonReaderSyncPlugin;
@@ -116,20 +117,17 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
                 }));
 
         // Template
-        containerEl.createEl('h3', {text: 'Template'});
+        containerEl.createEl('h3', {text: 'Template Builder'});
         
-        new Setting(containerEl)
-            .setName('Note Template')
-            .setDesc('Available variables: {bookName}, {chapter}, {highlightText}, {note}, {color}, {timestamp}, {id}')
-            .addTextArea(text => {
-                text.inputEl.rows = 5;
-                text.inputEl.cols = 50;
-                text.setValue(this.plugin.settings.noteTemplate)
-                    .onChange(async (value) => {
-                        this.plugin.settings.noteTemplate = value;
-                        await this.plugin.saveSettings();
-                    })
-            });
-            
+        TemplateBuilderUI.build(
+            containerEl, 
+            this.app, 
+            this.plugin, 
+            this.plugin.settings.noteTemplate, 
+            async (value) => {
+                this.plugin.settings.noteTemplate = value;
+                await this.plugin.saveSettings();
+            }
+        );
     }
 }
