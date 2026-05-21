@@ -21,7 +21,7 @@
 ### 手动安装 (Manual Installation)
 1. 前往 [Releases](https://github.com/seeyo/ob-moonreadernotesync/releases) 页面。
 2. 下载最新的 `moonreader-note-sync.zip` 压缩包，或者单独下载 `main.js`, `manifest.json`, 以及 `styles.css` 文件。
-3. 将下载的文件解压并放入您 Vault 的插件目录中：`[Vault]/.obsidian/plugins/obsidian-moonreader-sync/`。
+3. 将下载的文件解压并放入您 Vault 的插件目录中：`[Vault]/.obsidian/plugins/moonreader-note-sync/`。
 4. 重启 Obsidian 并在 设置 > 第三方插件 (Community Plugins) 中启用该插件。
 
 ## ⚙️ 配置说明 (Setup Guide)
