@@ -2,3 +2,8 @@ node_modules/
 main.js
 hot-reload
 .DS_Store
+.idea/
+.vscode/
+data.json
+moonreader_cache.json
+*.log

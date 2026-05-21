@@ -1,0 +1,36 @@
+name: Release Obsidian Plugin
+
+on:
+  push:
+    tags:
+      - "v*" # Push events to matching v*, i.e. v1.0.0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18.x"
+
+      - name: Build plugin
+        run: |
+          npm install
+          npm run build
+
+      - name: Create Zip Archive
+        run: |
+          zip moonreader-note-sync.zip main.js manifest.json styles.css
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            main.js
+            manifest.json
+            styles.css
+            moonreader-note-sync.zip
