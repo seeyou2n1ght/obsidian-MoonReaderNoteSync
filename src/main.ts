@@ -138,27 +138,27 @@ export default class MoonReaderSyncPlugin extends Plugin {
         new BookSuggestModal(this.app, this, books).open();
     }
 
-function escapeHtml(text: string): string {
-    if (!text) return "";
-    return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
+    private escapeHtml(text: string): string {
+        if (!text) return "";
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
 
     renderNotes(notes: MoonReaderNote[], template: string): string {
         let result = "";
         for (const note of notes) {
             let rendered = template;
-            rendered = rendered.replace(/{bookName}/g, escapeHtml(note.bookName));
-            rendered = rendered.replace(/{chapter}/g, escapeHtml(note.chapter));
-            rendered = rendered.replace(/{highlightText}/g, escapeHtml(note.highlightText));
-            rendered = rendered.replace(/{note}/g, escapeHtml(note.note));
-            rendered = rendered.replace(/{color}/g, escapeHtml(note.colorHex));
-            rendered = rendered.replace(/{timestamp}/g, escapeHtml(note.timestamp));
-            rendered = rendered.replace(/{id}/g, escapeHtml(note.id));
+            rendered = rendered.replace(/{bookName}/g, this.escapeHtml(note.bookName));
+            rendered = rendered.replace(/{chapter}/g, this.escapeHtml(note.chapter));
+            rendered = rendered.replace(/{highlightText}/g, this.escapeHtml(note.highlightText));
+            rendered = rendered.replace(/{note}/g, this.escapeHtml(note.note));
+            rendered = rendered.replace(/{color}/g, this.escapeHtml(note.colorHex));
+            rendered = rendered.replace(/{timestamp}/g, this.escapeHtml(note.timestamp));
+            rendered = rendered.replace(/{id}/g, this.escapeHtml(note.id));
             result += rendered;
         }
         return result;
