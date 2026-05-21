@@ -14,13 +14,13 @@ export class TemplateBuilderUI {
 
         // Left Panel: Draggable Fields
         const leftPanel = builderContainer.createDiv();
-        leftPanel.style.flex = '0 0 200px';
+        leftPanel.style.flex = '0 0 130px';
         leftPanel.style.display = 'flex';
         leftPanel.style.flexDirection = 'column';
-        leftPanel.style.gap = '8px';
+        leftPanel.style.gap = '6px';
 
         leftPanel.createEl('h4', { text: 'Available Fields' });
-        leftPanel.createEl('small', { text: 'Drag or click to insert', cls: 'setting-item-description' }).style.marginBottom = '8px';
+        leftPanel.createEl('small', { text: 'Drag or click', cls: 'setting-item-description' }).style.marginBottom = '4px';
 
         const fields = [
             { id: '{bookName}', name: 'Book Name', desc: 'Title of the book' },
@@ -88,19 +88,17 @@ export class TemplateBuilderUI {
         // Populate fields
         fields.forEach(f => {
             const fieldEl = leftPanel.createDiv({ cls: 'moonreader-field-pill' });
-            fieldEl.style.padding = '6px 12px';
+            fieldEl.style.padding = '4px 8px';
             fieldEl.style.backgroundColor = 'var(--background-secondary)';
             fieldEl.style.border = '1px solid var(--background-modifier-border)';
             fieldEl.style.borderRadius = '4px';
             fieldEl.style.cursor = 'grab';
             fieldEl.style.userSelect = 'none';
-            fieldEl.style.display = 'flex';
-            fieldEl.style.flexDirection = 'column';
+            fieldEl.style.textAlign = 'center';
+            fieldEl.style.color = 'var(--text-muted)';
+            fieldEl.title = f.name + ": " + f.desc; // 鼠标悬浮时显示提示
             
             fieldEl.createEl('strong', { text: f.id }).style.fontSize = '0.9em';
-            fieldEl.createEl('span', { text: f.name }).style.fontSize = '0.8em';
-            fieldEl.createEl('span', { text: f.desc }).style.fontSize = '0.7em';
-            fieldEl.style.color = 'var(--text-muted)';
 
             // Make draggable
             fieldEl.draggable = true;
