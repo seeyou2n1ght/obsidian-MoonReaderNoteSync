@@ -3,13 +3,7 @@ import pako from 'pako';
 export interface MoonReaderNote {
     id: string;
     bookName: string;
-    originalPath: string;
-    lowerPath: string;
     chapter: string;
-    paraOffset: string;
-    globalOffset: string;
-    highlightLength: string;
-    colorARGB: string;
     colorHex: string;
     timestamp: string;
     note: string;
@@ -18,83 +12,72 @@ export interface MoonReaderNote {
 
 export class AnParser {
     public static parseBuffer(buffer: ArrayBuffer): MoonReaderNote[] {
-        try {
-            // MoonReader .an files are typically zlib compressed.
-            const inflated = pako.inflate(new Uint8Array(buffer), { to: 'string' });
-            return this.parseText(inflated);
-        } catch (e) {
-            console.error("Failed to inflate .an file", e);
-            return [];
-        }
-    }
-
-    public static parseText(text: string): MoonReaderNote[] {
-        // MoonReader .an uses CRLF or LF, let's split by newline and remove carriage returns
-        const lines = text.split(/\r?\n/);
-        const notes: MoonReaderNote[] = [];
+        const str = this.inflateBuffer(buffer);
+        const lines = str.split(/\r?\n/);
         
-        // Each record is 17 lines
-        for (let i = 0; i < lines.length; i += 17) {
-            // Check if we have enough lines for a full record
-            // Some files might end with fewer empty lines if not perfectly padded, but let's assume 17.
-            // Minimum required to get highlight is 13 lines.
-            if (i + 12 >= lines.length) break;
+        let headerIndex = -1;
+        // 使用特征扫描：一条记录有17行，其中第0,4,6,8,9行必须是纯数字（可能包含负号）
+        for (let i = 0; i <= lines.length - 17; i++) {
+            const isNum = (offset: number) => /^-?\d+$/.test(lines[i + offset].trim());
+            if (isNum(0) && isNum(4) && isNum(6) && isNum(8) && isNum(9)) {
+                headerIndex = i;
+                break;
+            }
+        }
+
+        const notes: MoonReaderNote[] = [];
+        if (headerIndex === -1) return notes;
+
+        let idx = headerIndex;
+        while (idx + 16 < lines.length) {
+            const block = lines.slice(idx, idx + 17).map(l => l.trim());
             
-            const id = lines[i] || "";
-            const bookName = lines[i+1] || "";
-            if (!id && !bookName) continue; // skip completely empty trailing lines
+            try {
+                const annId = block[0];
+                const bookName = block[1];
+                const chapter = block[4];
+                const colorInt = parseInt(block[8], 10);
+                const tsMs = parseInt(block[9], 10);
+                const note = block[11];
+                const highlightText = block[12];
+                
+                let timestamp = "";
+                if (!isNaN(tsMs) && tsMs > 0) {
+                    const date = new Date(tsMs);
+                    timestamp = date.toISOString().replace('T', ' ').substring(0, 19);
+                }
+
+                if (highlightText || note) {
+                    notes.push({
+                        bookName: bookName || "Unknown",
+                        chapter: chapter,
+                        highlightText: highlightText,
+                        note: note,
+                        colorHex: isNaN(colorInt) ? "#000000" : AnParser.argbToHex(colorInt.toString()),
+                        timestamp: timestamp,
+                        id: annId
+                    });
+                }
+            } catch (e) {
+                // Ignore parsing errors for individual blocks
+            }
             
-            const originalPath = lines[i+2] || "";
-            const lowerPath = lines[i+3] || "";
-            const chapter = lines[i+4] || "";
-            const paraOffset = lines[i+5] || "";
-            const globalOffset = lines[i+6] || "";
-            const highlightLength = lines[i+7] || "";
-            const colorARGB = lines[i+8] || "0";
-            const timestamp = lines[i+9] || "0";
-            // lines[i+10] is reserved
-            const note = lines[i+11] || "";
-            const highlightText = lines[i+12] || "";
-            // lines 14-16 are statuses, line 17 is separator
-            
-            const colorHex = this.argbToHex(colorARGB);
-            
-            notes.push({
-                id,
-                bookName,
-                originalPath,
-                lowerPath,
-                chapter,
-                paraOffset,
-                globalOffset,
-                highlightLength,
-                colorARGB,
-                colorHex,
-                timestamp,
-                note,
-                highlightText
-            });
+            idx += 17;
         }
         
         return notes;
     }
 
-    public static parseBookNameOnly(buffer: ArrayBuffer): string | null {
+    private static inflateBuffer(buffer: ArrayBuffer): string {
         try {
-            // We just need the first few lines to get the book name (line 2)
-            // It's zlib compressed so we inflate the whole thing or chunks
-            const inflated = pako.inflate(new Uint8Array(buffer), { to: 'string' });
-            const lines = inflated.split(/\r?\n/, 3);
-            if (lines.length > 1) {
-                return lines[1];
-            }
-            return null;
-        } catch(e) {
-            return null;
+            return pako.inflate(new Uint8Array(buffer), { to: 'string' });
+        } catch (e) {
+            console.error("Failed to inflate .an file", e);
+            return "";
         }
     }
 
-    private static argbToHex(argbStr: string): string {
+    public static argbToHex(argbStr: string): string {
         const intVal = parseInt(argbStr, 10);
         if (isNaN(intVal)) return "#000000";
         // Convert to unsigned 32-bit
@@ -103,7 +86,6 @@ export class AnParser {
         const r = (uval >> 16) & 0xFF;
         const g = (uval >> 8) & 0xFF;
         const b = uval & 0xFF;
-        // Optionally extract A if needed, but we return standard HTML Hex
         return "#" + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
     }
 }

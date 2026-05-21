@@ -44,7 +44,13 @@ export default class MoonReaderSyncPlugin extends Plugin {
         if (await this.app.vault.adapter.exists(cachePath)) {
             const data = await this.app.vault.adapter.read(cachePath);
             try {
-                return JSON.parse(data);
+                const parsed = JSON.parse(data);
+                // Invalidate poisoned cache from older buggy parsers
+                if (parsed.length > 0 && parsed[0].notes && parsed[0].notes.length > 0 && parsed[0].notes[0].originalPath !== undefined) {
+                    console.log("Found outdated cache format. Invalidating cache.");
+                    return [];
+                }
+                return parsed;
             } catch (e) {
                 return [];
             }
@@ -127,6 +133,8 @@ export default class MoonReaderSyncPlugin extends Plugin {
         if (updatedCount > 0 || books.length !== cachedBooks.length) {
             await this.saveCache(books);
             new Notice(updatedCount > 0 ? `Synced successfully. ${updatedCount} books updated.` : `Synced successfully. Cache rebuilt.`);
+        } else {
+            new Notice("Everything is up to date. Loaded from cache.");
         }
         
         new BookSuggestModal(this.app, this, books).open();
