@@ -50,9 +50,9 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
         
         new Setting(containerEl)
             .setName('WebDAV URL')
-            .setDesc('Base URL to your WebDAV server')
+            .setDesc('Full URL to the folder containing your .an files (e.g. https://.../dav/Books/.Moon+/Cache)')
             .addText(text => text
-                .setPlaceholder('https://dav.server.com/dav/')
+                .setPlaceholder('https://dav.server.com/dav/Books/.Notes/')
                 .setValue(this.plugin.settings.webDavUrl)
                 .onChange(async (value) => {
                     this.plugin.settings.webDavUrl = value;
@@ -89,16 +89,6 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
                     }
                 });
             });
-
-        new Setting(containerEl)
-            .setName('MoonReader Notes Path')
-            .setDesc('Relative path to the .an files in WebDAV')
-            .addText(text => text
-                .setValue(this.plugin.settings.moonReaderPath)
-                .onChange(async (value) => {
-                    this.plugin.settings.moonReaderPath = value;
-                    await this.plugin.saveSettings();
-                }));
 
         // UI & Behavior
         containerEl.createEl('h3', {text: 'Behavior & UI'});

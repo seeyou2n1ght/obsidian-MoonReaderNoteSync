@@ -49,7 +49,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
         const client = new WebDAVClient(this.settings.webDavUrl, this.settings.username, this.settings.encryptedPass, this.settings.keyFilePath);
         
         try {
-            const files = await client.getFiles(this.settings.moonReaderPath);
+            const files = await client.getFiles();
             const anFiles = files.filter(f => f.href.endsWith('.an'));
             
             if (anFiles.length === 0) {

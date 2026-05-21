@@ -3,7 +3,6 @@ export interface MoonReaderSyncSettings {
     username: string;
     encryptedPass: string;
     keyFilePath: string;
-    moonReaderPath: string;
     
     enableHoverPreview: boolean;
     insertAction: "ask" | "append" | "overwrite";
@@ -12,11 +11,10 @@ export interface MoonReaderSyncSettings {
 }
 
 export const DEFAULT_SETTINGS: MoonReaderSyncSettings = {
-    webDavUrl: 'https://dav.jianguoyun.com/dav/',
+    webDavUrl: 'https://dav.jianguoyun.com/dav/Books/.Notes/',
     username: '',
     encryptedPass: '',
     keyFilePath: '',
-    moonReaderPath: '/Books/.Notes/',
     
     enableHoverPreview: true,
     insertAction: "ask",

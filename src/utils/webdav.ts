@@ -25,9 +25,13 @@ export class WebDAVClient {
     private async getAuthHeader(): Promise<Record<string, string>> {
         if (!this.username || !this.encryptedPass) return {};
         const password = await CryptoHelper.decrypt(this.encryptedPass, this.keyPath);
+        if (!password) {
+            throw new Error("Decrypted password is empty! The AES key might have changed. Please re-enter your password in the settings.");
+        }
         const token = Buffer.from(`${this.username}:${password}`).toString('base64');
         return {
-            'Authorization': `Basic ${token}`
+            'Authorization': `Basic ${token}`,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         };
     }
 
@@ -49,18 +53,44 @@ export class WebDAVClient {
         }
     }
 
-    public async getFiles(path: string): Promise<WebDAVFile[]> {
-        const fullUrl = this.url + (path.startsWith('/') ? path.substring(1) : path);
+    public async getFiles(): Promise<WebDAVFile[]> {
+        const rawUrl = this.url;
+        let encodedUrl = rawUrl;
+        try {
+            const urlObj = new URL(rawUrl);
+            urlObj.pathname = urlObj.pathname.split('/').map(s => encodeURIComponent(decodeURIComponent(s))).join('/');
+            encodedUrl = urlObj.toString();
+        } catch(e) {
+            console.error("URL parsing failed", e);
+        }
+
         const headers = await this.getAuthHeader();
         
-        const response = await requestUrl({
-            url: fullUrl,
-            method: 'PROPFIND',
-            headers: {
-                ...headers,
-                'Depth': '1'
-            }
-        });
+        // 我们采取双重保障：先尝试标准的 Encoded URL，若被 Alist 报 403 拒绝，则回退到 Raw URL。
+        let response;
+        try {
+            console.log("PROPFIND requesting encoded URL:", encodedUrl);
+            response = await requestUrl({
+                url: encodedUrl,
+                method: 'PROPFIND',
+                headers: {
+                    ...headers,
+                    'Depth': '1',
+                    'Accept': '*/*'
+                }
+            });
+        } catch (e: any) {
+            console.warn("PROPFIND with encoded URL failed. Retrying with raw URL...", e);
+            response = await requestUrl({
+                url: rawUrl,
+                method: 'PROPFIND',
+                headers: {
+                    ...headers,
+                    'Depth': '1',
+                    'Accept': '*/*'
+                }
+            });
+        }
 
         if (response.status !== 207) {
             throw new Error(`WebDAV PROPFIND failed with status: ${response.status}`);
@@ -71,7 +101,6 @@ export class WebDAVClient {
         const responses = doc.getElementsByTagNameNS("*", "response");
         
         const files: WebDAVFile[] = [];
-        
         for (let i = 0; i < responses.length; i++) {
             const res = responses[i];
             const href = res.getElementsByTagNameNS("*", "href")[0]?.textContent || "";
@@ -82,14 +111,9 @@ export class WebDAVClient {
             
             const resType = prop.getElementsByTagNameNS("*", "resourcetype")[0];
             const isCollection = resType && resType.getElementsByTagNameNS("*", "collection").length > 0;
-            
             const lastModified = prop.getElementsByTagNameNS("*", "getlastmodified")[0]?.textContent || "";
             const contentType = prop.getElementsByTagNameNS("*", "getcontenttype")[0]?.textContent || "";
             const contentLengthStr = prop.getElementsByTagNameNS("*", "getcontentlength")[0]?.textContent || "0";
-            
-            // Skip the directory itself (Depth: 1 returns the dir + children)
-            // A simple check is if href exactly matches fullUrl path, but it's easier to just check if it's the root we requested
-            // We'll return everything and let caller filter.
             
             files.push({
                 href: decodeURIComponent(href),
@@ -99,12 +123,22 @@ export class WebDAVClient {
                 isCollection
             });
         }
-        
         return files;
     }
 
-    public async getFileBuffer(path: string): Promise<ArrayBuffer> {
-        const fullUrl = this.url + (path.startsWith('/') ? path.substring(1) : path);
+    public async getFileBuffer(href: string): Promise<ArrayBuffer> {
+        let fullUrl = href;
+        // 如果 href 只是一个绝对路径 (例如 /dav/folder/...an)
+        if (!href.startsWith('http')) {
+            try {
+                const baseUrl = new URL(this.url);
+                fullUrl = baseUrl.origin + (href.startsWith('/') ? href : '/' + href);
+            } catch (e) {
+                // 回退处理
+                fullUrl = this.url + (href.startsWith('/') ? href.substring(1) : href);
+            }
+        }
+
         const headers = await this.getAuthHeader();
         
         const response = await requestUrl({
