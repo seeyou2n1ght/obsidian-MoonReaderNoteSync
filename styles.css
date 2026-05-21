@@ -1,0 +1,41 @@
+/* MoonReader WebDAV Sync Plugin Styles */
+
+.moonreader-book-item {
+    position: relative;
+}
+
+.moonreader-book-actions {
+    display: none;
+    align-items: center;
+}
+
+.moonreader-book-item:hover .moonreader-book-actions {
+    display: flex;
+}
+
+.moonreader-action-btn {
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    transition: background-color 0.1s, color 0.1s;
+}
+
+.moonreader-action-btn:hover {
+    background-color: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.moonreader-preview-popover {
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    z-index: var(--layer-popover);
+}
+
+.moonreader-preview-loading {
+    color: var(--text-faint);
+    font-style: italic;
+}
