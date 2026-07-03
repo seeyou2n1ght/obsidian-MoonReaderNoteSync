@@ -1,22 +1,5 @@
 import { Platform, App, DataAdapter, arrayBufferToBase64, base64ToArrayBuffer } from 'obsidian';
 
-declare const require: (module: string) => unknown;
-
-interface FSModule {
-    existsSync(path: string): boolean;
-    readFileSync(path: string, encoding: string): string;
-    writeFileSync(path: string, content: string, encoding: string): void;
-}
-
-let fsModule: FSModule | null = null;
-if (!Platform.isMobile) {
-    try {
-        fsModule = require('fs') as FSModule;
-    } catch {
-        console.warn("Node fs module load error");
-    }
-}
-
 export class CryptoHelper {
     private static adapter: DataAdapter | null = null;
 
@@ -25,9 +8,6 @@ export class CryptoHelper {
     }
 
     private static async fileExists(path: string): Promise<boolean> {
-        if (!Platform.isMobile && fsModule) {
-            return fsModule.existsSync(path);
-        }
         if (this.adapter) {
             return await this.adapter.exists(path);
         }
@@ -35,9 +15,6 @@ export class CryptoHelper {
     }
 
     private static async readFile(path: string): Promise<string> {
-        if (!Platform.isMobile && fsModule) {
-            return fsModule.readFileSync(path, 'utf8');
-        }
         if (this.adapter) {
             return await this.adapter.read(path);
         }
@@ -45,10 +22,6 @@ export class CryptoHelper {
     }
 
     private static async writeFile(path: string, content: string): Promise<void> {
-        if (!Platform.isMobile && fsModule) {
-            fsModule.writeFileSync(path, content, 'utf8');
-            return;
-        }
         if (this.adapter) {
             await this.adapter.write(path, content);
             return;
