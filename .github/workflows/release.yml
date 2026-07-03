@@ -1,9 +1,10 @@
 name: Release Obsidian Plugin
 
 on:
+  workflow_dispatch:
   push:
     tags:
-      - "*" # Push events to matching any tag (e.g., 0.0.1)
+      - "*.*.*"
 
 permissions:
   contents: write
