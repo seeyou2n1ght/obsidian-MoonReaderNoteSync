@@ -77,14 +77,15 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
                 text.setPlaceholder('Enter password');
                 text.onChange((value) => {
                     if (value && this.plugin.settings.keyFilePath) {
-                        try {
-                            const encrypted = await CryptoHelper.encrypt(value, this.plugin.settings.keyFilePath);
-                            this.plugin.settings.encryptedPass = encrypted;
-                            void this.plugin.saveSettings();
-                            new Notice("Password encrypted and saved.");
-                        } catch (e) {
-                            new Notice("Failed to encrypt password. Is the key path valid?");
-                        }
+                        CryptoHelper.encrypt(value, this.plugin.settings.keyFilePath)
+                            .then(encrypted => {
+                                this.plugin.settings.encryptedPass = encrypted;
+                                void this.plugin.saveSettings();
+                                new Notice("Password encrypted and saved.");
+                            })
+                            .catch(() => {
+                                new Notice("Failed to encrypt password. Is the key path valid?");
+                            });
                     } else if (value && !this.plugin.settings.keyFilePath) {
                         new Notice("Please configure Local AES Key Path first.");
                     }
@@ -111,7 +112,7 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
                 .addOption('append', 'Always Append')
                 .addOption('overwrite', 'Always Overwrite (Preserves Frontmatter)')
                 .setValue(this.plugin.settings.insertAction)
-                .onChange(async (value: "ask"|"append"|"overwrite") => {
+                .onChange((value: "ask"|"append"|"overwrite") => {
                     this.plugin.settings.insertAction = value;
                     void this.plugin.saveSettings();
                 }));
