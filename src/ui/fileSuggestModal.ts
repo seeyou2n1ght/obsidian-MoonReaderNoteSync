@@ -16,7 +16,8 @@ export class FileSuggestModal extends SuggestModal<string> {
     }
 
     getSuggestions(query: string): string[] {
-        const files = this.app.metadataCache.getCachedFiles();
+        const cache = this.app.metadataCache as unknown as { getCachedFiles(): string[] };
+        const files = cache.getCachedFiles();
         const lowerQuery = query.toLowerCase();
         return files.filter(f => f.toLowerCase().includes(lowerQuery) && f.endsWith('.md'));
     }
