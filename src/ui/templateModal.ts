@@ -1,4 +1,4 @@
-import { App, Modal, Setting, ButtonComponent } from 'obsidian';
+import { App, Modal, ButtonComponent } from 'obsidian';
 import MoonReaderSyncPlugin from '../main';
 import { BookItem } from './bookSuggestModal';
 import { FileSuggestModal } from './fileSuggestModal';
@@ -31,17 +31,17 @@ export class TemplateModal extends Modal {
         );
 
         const btnContainer = contentEl.createDiv();
-        btnContainer.style.display = "flex";
-        btnContainer.style.justifyContent = "flex-end";
-        btnContainer.style.gap = "10px";
-        btnContainer.style.marginTop = "20px";
+        btnContainer.setCssStyles({ display: "flex" });
+        btnContainer.setCssStyles({ justifyContent: "flex-end" });
+        btnContainer.setCssStyles({ gap: "10px" });
+        btnContainer.setCssStyles({ marginTop: "20px" });
 
         new ButtonComponent(btnContainer)
             .setButtonText("Insert at Cursor")
             .setCta()
             .onClick(() => {
                 this.close();
-                this.plugin.importBookToCursor(this.bookItem, this.currentTemplate);
+                void this.plugin.importBookToCursor(this.bookItem, this.currentTemplate);
             });
 
         new ButtonComponent(btnContainer)

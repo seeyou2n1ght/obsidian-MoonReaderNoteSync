@@ -1,4 +1,4 @@
-import { requestUrl, RequestUrlParam } from 'obsidian';
+import { requestUrl } from 'obsidian';
 import { CryptoHelper } from './crypto';
 
 export interface WebDAVFile {
@@ -43,7 +43,7 @@ export class WebDAVClient {
         if (!password) {
             throw new Error("Decrypted password is empty! The AES key might have changed. Please re-enter your password in the settings.");
         }
-        const token = Buffer.from(`${this.username}:${password}`).toString('base64');
+        const token = btoa();
         return {
             'Authorization': `Basic ${token}`,
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -81,7 +81,7 @@ export class WebDAVClient {
 
         const headers = await this.getAuthHeader(rawUrl);
         
-        // 我们采取双重保障：先尝试标准的 Encoded URL，若被 Alist 报 403 拒绝，则回退到 Raw URL。
+        // 我们采取双重保障：先尝试标准�?Encoded URL，若�?Alist �?403 拒绝，则回退�?Raw URL�?
         let response;
         try {
             console.log("PROPFIND requesting encoded URL:", encodedUrl);
@@ -94,7 +94,7 @@ export class WebDAVClient {
                     'Accept': '*/*'
                 }
             });
-        } catch (e: any) {
+        } catch {
             console.warn("PROPFIND with encoded URL failed. Retrying with raw URL...", e);
             response = await requestUrl({
                 url: rawUrl,
@@ -143,7 +143,7 @@ export class WebDAVClient {
 
     public async getFileBuffer(href: string): Promise<ArrayBuffer> {
         let fullUrl = href;
-        // 如果 href 只是一个绝对路径 (例如 /dav/folder/...an)
+        // 如果 href 只是一个绝对路�?(例如 /dav/folder/...an)
         if (!href.startsWith('http')) {
             try {
                 const baseUrl = new URL(this.url);

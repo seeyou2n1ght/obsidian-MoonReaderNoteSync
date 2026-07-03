@@ -1,22 +1,22 @@
-import { Platform, App, DataAdapter } from 'obsidian';
+import { Platform, App, DataAdapter, arrayBufferToBase64, base64ToArrayBuffer } from 'obsidian';
 
-declare var require: any;
-let fsModule: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const require: (module: string) => any;
+
+interface FSModule {
+    existsSync(path: string): boolean;
+    readFileSync(path: string, encoding: string): string;
+    writeFileSync(path: string, content: string, encoding: string): void;
+}
+
+let fsModule: FSModule | null = null;
 if (!Platform.isMobile) {
     try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         fsModule = require('fs');
     } catch (e) {
-        console.warn("Node fs module load error:", e);
+        console.warn("Node fs module load error", e);
     }
-}
-
-function bufferToBase64(buf: ArrayBuffer): string {
-    return Buffer.from(buf).toString('base64');
-}
-
-function base64ToBuffer(b64: string): ArrayBuffer {
-    const buf = Buffer.from(b64, 'base64');
-    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 }
 
 export class CryptoHelper {
@@ -62,7 +62,7 @@ export class CryptoHelper {
         if (!keyPath || !(await this.fileExists(keyPath))) return null;
         try {
             const keyBase64 = await this.readFile(keyPath);
-            const keyBuffer = base64ToBuffer(keyBase64);
+            const keyBuffer = base64ToArrayBuffer(keyBase64);
             return await window.crypto.subtle.importKey(
                 "raw",
                 keyBuffer,
@@ -71,7 +71,7 @@ export class CryptoHelper {
                 ["encrypt", "decrypt"]
             );
         } catch (e) {
-            console.error("Failed to read or import key from path:", keyPath, e);
+            console.error("Failed to read or import key from path", e);
             return null;
         }
     }
@@ -84,7 +84,7 @@ export class CryptoHelper {
                 ["encrypt", "decrypt"]
             );
             const exportedKey = await window.crypto.subtle.exportKey("raw", key);
-            const keyBase64 = bufferToBase64(exportedKey);
+            const keyBase64 = arrayBufferToBase64(exportedKey);
             await this.writeFile(keyPath, keyBase64);
             return true;
         } catch (e) {
@@ -107,8 +107,8 @@ export class CryptoHelper {
             encoded
         );
         
-        const ivBase64 = bufferToBase64(iv.buffer as ArrayBuffer);
-        const cipherBase64 = bufferToBase64(cipherText);
+        const ivBase64 = arrayBufferToBase64(iv.buffer as ArrayBuffer);
+        const cipherBase64 = arrayBufferToBase64(cipherText);
         return ivBase64 + ":" + cipherBase64;
     }
 
@@ -118,8 +118,8 @@ export class CryptoHelper {
         const key = await this.getRawKey(keyPath);
         if (!key) throw new Error("Key not found at path");
 
-        const ivBuffer = base64ToBuffer(ivBase64);
-        const cipherBuffer = base64ToBuffer(cipherBase64);
+        const ivBuffer = base64ToArrayBuffer(ivBase64);
+        const cipherBuffer = base64ToArrayBuffer(cipherBase64);
 
         try {
             const decrypted = await window.crypto.subtle.decrypt(

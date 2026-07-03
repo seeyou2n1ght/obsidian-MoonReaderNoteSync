@@ -7,17 +7,17 @@ export class TemplateBuilderUI {
         const builderContainer = containerEl.createDiv({ cls: 'moonreader-template-builder' });
         
         // Ensure flex layout
-        builderContainer.style.display = 'flex';
-        builderContainer.style.gap = '20px';
-        builderContainer.style.marginTop = '10px';
-        builderContainer.style.alignItems = 'flex-start';
+        builderContainer.setCssStyles({ display: 'flex' });
+        builderContainer.setCssStyles({ gap: '20px' });
+        builderContainer.setCssStyles({ marginTop: '10px' });
+        builderContainer.setCssStyles({ alignItems: 'flex-start' });
 
         // Left Panel: Draggable Fields
         const leftPanel = builderContainer.createDiv();
-        leftPanel.style.flex = '0 0 130px';
-        leftPanel.style.display = 'flex';
-        leftPanel.style.flexDirection = 'column';
-        leftPanel.style.gap = '6px';
+        leftPanel.setCssStyles({ flex: '0 0 130px' });
+        leftPanel.setCssStyles({ display: 'flex' });
+        leftPanel.setCssStyles({ flexDirection: 'column' });
+        leftPanel.setCssStyles({ gap: '6px' });
 
         leftPanel.createEl('h4', { text: 'Available Fields' });
         leftPanel.createEl('small', { text: 'Drag or click', cls: 'setting-item-description' }).style.marginBottom = '4px';
@@ -36,29 +36,29 @@ export class TemplateBuilderUI {
         
         // Right Panel: Editor and Preview
         const rightPanel = builderContainer.createDiv();
-        rightPanel.style.flex = '1 1 auto';
-        rightPanel.style.display = 'flex';
-        rightPanel.style.flexDirection = 'column';
-        rightPanel.style.gap = '15px';
+        rightPanel.setCssStyles({ flex: '1 1 auto' });
+        rightPanel.setCssStyles({ display: 'flex' });
+        rightPanel.setCssStyles({ flexDirection: 'column' });
+        rightPanel.setCssStyles({ gap: '15px' });
 
         const editorTitle = rightPanel.createEl('h4', { text: 'Template Editor' });
         
         const textArea = rightPanel.createEl('textarea', { cls: 'moonreader-template-textarea' });
-        textArea.style.width = '100%';
-        textArea.style.minHeight = '150px';
-        textArea.style.fontFamily = 'monospace';
-        textArea.style.resize = 'vertical';
-        textArea.style.padding = '8px';
+        textArea.setCssStyles({ width: '100%' });
+        textArea.setCssStyles({ minHeight: '150px' });
+        textArea.setCssStyles({ fontFamily: 'monospace' });
+        textArea.setCssStyles({ resize: 'vertical' });
+        textArea.setCssStyles({ padding: '8px' });
         textArea.value = currentTemplate;
 
         // Preview Area
         rightPanel.createEl('h4', { text: 'Live Preview' });
         const previewEl = rightPanel.createDiv({ cls: 'moonreader-template-preview markdown-rendered' });
-        previewEl.style.border = '1px solid var(--background-modifier-border)';
-        previewEl.style.padding = '15px';
-        previewEl.style.borderRadius = '4px';
-        previewEl.style.minHeight = '100px';
-        previewEl.style.backgroundColor = 'var(--background-primary)';
+        previewEl.setCssStyles({ border: '1px solid var(--background-modifier-border)' });
+        previewEl.setCssStyles({ padding: '15px' });
+        previewEl.setCssStyles({ borderRadius: '4px' });
+        previewEl.setCssStyles({ minHeight: '100px' });
+        previewEl.setCssStyles({ backgroundColor: 'var(--background-primary)' });
 
         const dummyNote: MoonReaderNote = {
             id: '12345678',
@@ -80,7 +80,7 @@ export class TemplateBuilderUI {
             // We use MarkdownRenderer to provide a real Obsidian preview
             // A dummy component is needed for the renderer
             const component = new Component();
-            MarkdownRenderer.renderMarkdown(renderedText, previewEl, '', component);
+            void MarkdownRenderer.render(app, renderedText, previewEl, '', component);
         };
 
         textArea.addEventListener('input', updatePreview);
@@ -88,16 +88,15 @@ export class TemplateBuilderUI {
         // Populate fields
         fields.forEach(f => {
             const fieldEl = leftPanel.createDiv({ cls: 'moonreader-field-pill' });
-            fieldEl.style.padding = '4px 8px';
-            fieldEl.style.backgroundColor = 'var(--background-secondary)';
-            fieldEl.style.border = '1px solid var(--background-modifier-border)';
-            fieldEl.style.borderRadius = '4px';
-            fieldEl.style.cursor = 'grab';
-            fieldEl.style.userSelect = 'none';
-            fieldEl.style.textAlign = 'center';
-            fieldEl.style.color = 'var(--text-muted)';
-            fieldEl.title = f.name + ": " + f.desc; // 鼠标悬浮时显示提示
-            
+            fieldEl.setCssStyles({ padding: '4px 8px' });
+            fieldEl.setCssStyles({ backgroundColor: 'var(--background-secondary)' });
+            fieldEl.setCssStyles({ border: '1px solid var(--background-modifier-border)' });
+            fieldEl.setCssStyles({ borderRadius: '4px' });
+            fieldEl.setCssStyles({ cursor: 'grab' });
+            fieldEl.setCssStyles({ userSelect: 'none' });
+            fieldEl.setCssStyles({ textAlign: 'center' });
+            fieldEl.setCssStyles({ color: 'var(--text-muted)' });
+            fieldEl.title = f.name + ": " + f.desc; // 榧犳爣鎮诞鏃舵樉绀烘彁绀?            
             fieldEl.createEl('strong', { text: f.id }).style.fontSize = '0.9em';
 
             // Make draggable

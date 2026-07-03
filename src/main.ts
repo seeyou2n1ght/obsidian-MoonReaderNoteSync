@@ -1,4 +1,4 @@
-import { Plugin, Platform, Notice, TFile, MarkdownView } from 'obsidian';
+import { Plugin, Notice, TFile, MarkdownView } from 'obsidian';
 import { MoonReaderSyncSettings, DEFAULT_SETTINGS } from './settings';
 import { MoonReaderWebDAVSettingTab } from './ui/settingTab';
 import { WebDAVClient } from './utils/webdav';
@@ -17,20 +17,20 @@ export default class MoonReaderSyncPlugin extends Plugin {
         this.addSettingTab(new MoonReaderWebDAVSettingTab(this.app, this));
 
         this.addRibbonIcon('cloud-download', 'Sync MoonReader Notes', () => {
-            this.pullNotesCommand();
+            void this.pullNotesCommand();
         });
 
         this.addCommand({
             id: 'pull-moonreader-notes',
             name: 'Sync Notes (Smart)',
             callback: () => {
-                this.pullNotesCommand();
+                void this.pullNotesCommand();
             }
         });
     }
 
     async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, (await this.loadData()) as Partial<MoonReaderSyncSettings>);
     }
 
     async saveSettings() {
@@ -42,7 +42,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
         if (await this.app.vault.adapter.exists(cachePath)) {
             const data = await this.app.vault.adapter.read(cachePath);
             try {
-                const parsed = JSON.parse(data);
+                const parsed = JSON.parse(data) as BookItem[];
                 // Invalidate poisoned cache from older buggy parsers
                 if (parsed.length > 0 && parsed[0].notes && parsed[0].notes.length > 0 && parsed[0].notes[0].originalPath !== undefined) {
                     console.log("Found outdated cache format. Invalidating cache.");
@@ -117,7 +117,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
                         contentLength: file.contentLength
                     });
                     updatedCount++;
-                } catch(e) {
+                } catch {
                     console.error("Failed to fetch/parse", file.href, e);
                 }
             }

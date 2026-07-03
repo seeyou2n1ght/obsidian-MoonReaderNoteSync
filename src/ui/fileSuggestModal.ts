@@ -27,6 +27,6 @@ export class FileSuggestModal extends SuggestModal<TFile> {
     }
 
     onChooseSuggestion(file: TFile, evt: MouseEvent | KeyboardEvent) {
-        this.plugin.importBookToFile(this.bookItem, this.template, file);
+        void this.plugin.importBookToFile(this.bookItem, this.template, file);
     }
 }

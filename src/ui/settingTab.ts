@@ -15,19 +15,19 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
         const {containerEl} = this;
         containerEl.empty();
 
-        containerEl.createEl('h2', {text: 'MoonReader WebDAV Sync Settings'});
+        new Setting(containerEl).setName('').setHeading();
 
         // Security
-        containerEl.createEl('h3', {text: 'Security (Desktop Only)'});
+        new Setting(containerEl).setName('').setHeading();
         new Setting(containerEl)
             .setName('Local AES Key Path')
             .setDesc('Path to store the AES key. Must be OUTSIDE the Vault for security. E.g., C:/Users/name/.moonreader_key')
             .addText(text => text
                 .setPlaceholder('Enter path for key')
                 .setValue(this.plugin.settings.keyFilePath)
-                .onChange(async (value) => {
+                .onChange((value) => {
                     this.plugin.settings.keyFilePath = value;
-                    await this.plugin.saveSettings();
+                    void this.plugin.saveSettings();
                 })
             )
             .addButton(btn => btn
@@ -47,7 +47,7 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
             );
 
         // WebDAV
-        containerEl.createEl('h3', {text: 'WebDAV Configuration'});
+        new Setting(containerEl).setName('').setHeading();
         
         new Setting(containerEl)
             .setName('WebDAV URL')
@@ -55,18 +55,18 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
             .addText(text => text
                 .setPlaceholder('https://dav.server.com/dav/Books/.Notes/')
                 .setValue(this.plugin.settings.webDavUrl)
-                .onChange(async (value) => {
+                .onChange((value) => {
                     this.plugin.settings.webDavUrl = value;
-                    await this.plugin.saveSettings();
+                    void this.plugin.saveSettings();
                 }));
 
         new Setting(containerEl)
             .setName('Username')
             .addText(text => text
                 .setValue(this.plugin.settings.username)
-                .onChange(async (value) => {
+                .onChange((value) => {
                     this.plugin.settings.username = value;
-                    await this.plugin.saveSettings();
+                    void this.plugin.saveSettings();
                 }));
 
         new Setting(containerEl)
@@ -75,12 +75,12 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
             .addText(text => {
                 text.inputEl.type = 'password';
                 text.setPlaceholder('Enter password');
-                text.onChange(async (value) => {
+                text.onChange((value) => {
                     if (value && this.plugin.settings.keyFilePath) {
                         try {
                             const encrypted = await CryptoHelper.encrypt(value, this.plugin.settings.keyFilePath);
                             this.plugin.settings.encryptedPass = encrypted;
-                            await this.plugin.saveSettings();
+                            void this.plugin.saveSettings();
                             new Notice("Password encrypted and saved.");
                         } catch (e) {
                             new Notice("Failed to encrypt password. Is the key path valid?");
@@ -92,16 +92,16 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
             });
 
         // UI & Behavior
-        containerEl.createEl('h3', {text: 'Behavior & UI'});
+        new Setting(containerEl).setName('').setHeading();
         
         new Setting(containerEl)
             .setName('Enable Hover Preview')
             .setDesc('Show rendered notes preview when hovering over a book')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.enableHoverPreview)
-                .onChange(async (value) => {
+                .onChange((value) => {
                     this.plugin.settings.enableHoverPreview = value;
-                    await this.plugin.saveSettings();
+                    void this.plugin.saveSettings();
                 }));
 
         new Setting(containerEl)
@@ -113,20 +113,20 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.insertAction)
                 .onChange(async (value: "ask"|"append"|"overwrite") => {
                     this.plugin.settings.insertAction = value;
-                    await this.plugin.saveSettings();
+                    void this.plugin.saveSettings();
                 }));
 
         // Template
-        containerEl.createEl('h3', {text: 'Template Builder'});
+        new Setting(containerEl).setName('').setHeading();
         
         TemplateBuilderUI.build(
             containerEl, 
             this.app, 
             this.plugin, 
             this.plugin.settings.noteTemplate, 
-            async (value) => {
+            (value) => {
                 this.plugin.settings.noteTemplate = value;
-                await this.plugin.saveSettings();
+                void this.plugin.saveSettings();
             }
         );
     }

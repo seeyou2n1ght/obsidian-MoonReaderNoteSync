@@ -1,6 +1,6 @@
-import { App, SuggestModal, Notice, setIcon } from 'obsidian';
+import { App, SuggestModal, setIcon, activeDocument } from 'obsidian';
 import MoonReaderSyncPlugin from '../main';
-import { MoonReaderNote, AnParser } from '../utils/anParser';
+import { MoonReaderNote } from '../utils/anParser';
 import { TemplateModal } from './templateModal';
 import { FileSuggestModal } from './fileSuggestModal';
 
@@ -31,14 +31,14 @@ export class BookSuggestModal extends SuggestModal<BookItem> {
 
     renderSuggestion(item: BookItem, el: HTMLElement) {
         el.addClass("moonreader-book-item");
-        el.style.display = "flex";
-        el.style.justifyContent = "space-between";
-        el.style.alignItems = "center";
+        el.setCssStyles({ display: "flex" });
+        el.setCssStyles({ justifyContent: "space-between" });
+        el.setCssStyles({ alignItems: "center" });
         
         el.createSpan({ text: item.bookName });
         
         const actionContainer = el.createDiv({ cls: "moonreader-book-actions" });
-        actionContainer.style.display = "none";
+        actionContainer.setCssStyles({ display: "none" });
         
         const editBtn = actionContainer.createSpan({ cls: "moonreader-action-btn", title: "Adjust Template" });
         setIcon(editBtn, "pencil");
@@ -53,7 +53,7 @@ export class BookSuggestModal extends SuggestModal<BookItem> {
         cursorBtn.onClickEvent((evt) => {
             evt.stopPropagation();
             this.close();
-            this.plugin.importBookToCursor(item, this.plugin.settings.noteTemplate);
+            void this.plugin.importBookToCursor(item, this.plugin.settings.noteTemplate);
         });
 
         const fileBtn = actionContainer.createSpan({ cls: "moonreader-action-btn", title: "Insert to Specific Note" });
@@ -65,14 +65,14 @@ export class BookSuggestModal extends SuggestModal<BookItem> {
         });
 
         el.addEventListener("mouseenter", () => {
-            actionContainer.style.display = "flex";
-            actionContainer.style.gap = "8px";
+            actionContainer.setCssStyles({ display: "flex" });
+            actionContainer.setCssStyles({ gap: "8px" });
             if (this.plugin.settings.enableHoverPreview) {
-                this.showPreview(item, el);
+                void this.showPreview(item, el);
             }
         });
         el.addEventListener("mouseleave", () => {
-            actionContainer.style.display = "none";
+            actionContainer.setCssStyles({ display: "none" });
             this.hidePreview();
         });
     }
@@ -80,21 +80,21 @@ export class BookSuggestModal extends SuggestModal<BookItem> {
     async showPreview(item: BookItem, el: HTMLElement) {
         if (this.previewEl) this.hidePreview();
         
-        this.previewEl = document.body.createDiv({ cls: "moonreader-preview-popover popover" });
-        this.previewEl.style.position = "absolute";
-        this.previewEl.style.zIndex = "1000";
-        this.previewEl.style.width = "400px";
-        this.previewEl.style.maxHeight = "300px";
-        this.previewEl.style.overflow = "auto";
-        this.previewEl.style.padding = "10px";
-        this.previewEl.style.backgroundColor = "var(--background-primary)";
-        this.previewEl.style.border = "1px solid var(--background-modifier-border)";
-        this.previewEl.style.borderRadius = "5px";
-        this.previewEl.style.boxShadow = "0 4px 10px rgba(0,0,0,0.5)";
+        this.previewEl = activeDocument.body.createDiv({ cls: "moonreader-preview-popover popover" });
+        this.previewEl.setCssStyles({ position: "absolute" });
+        this.previewEl.setCssStyles({ zIndex: "1000" });
+        this.previewEl.setCssStyles({ width: "400px" });
+        this.previewEl.setCssStyles({ maxHeight: "300px" });
+        this.previewEl.setCssStyles({ overflow: "auto" });
+        this.previewEl.setCssStyles({ padding: "10px" });
+        this.previewEl.setCssStyles({ backgroundColor: "var(--background-primary)" });
+        this.previewEl.setCssStyles({ border: "1px solid var(--background-modifier-border)" });
+        this.previewEl.setCssStyles({ borderRadius: "5px" });
+        this.previewEl.setCssStyles({ boxShadow: "0 4px 10px rgba(0,0,0,0.5)" });
         
         const rect = el.getBoundingClientRect();
-        this.previewEl.style.top = `${rect.top}px`;
-        this.previewEl.style.left = `${rect.right + 10}px`;
+        this.previewEl.setCssStyles({ top: `${rect.top}px` });
+        this.previewEl.setCssStyles({ left: `${rect.right + 10}px` });
 
         this.previewEl.createEl("div", { text: "Loading preview...", cls: "moonreader-preview-loading" });
         
@@ -103,7 +103,7 @@ export class BookSuggestModal extends SuggestModal<BookItem> {
             if (this.previewEl) {
                 this.previewEl.empty();
                 const pre = this.previewEl.createEl("pre");
-                pre.style.whiteSpace = "pre-wrap";
+                pre.setCssStyles({ whiteSpace: "pre-wrap" });
                 pre.innerText = previewText;
             }
         } catch(e) {
@@ -130,7 +130,7 @@ export class BookSuggestModal extends SuggestModal<BookItem> {
         if (evt.shiftKey) {
             new TemplateModal(this.app, this.plugin, item).open();
         } else {
-            this.plugin.importBookToCursor(item, this.plugin.settings.noteTemplate);
+            void this.plugin.importBookToCursor(item, this.plugin.settings.noteTemplate);
         }
     }
 }
