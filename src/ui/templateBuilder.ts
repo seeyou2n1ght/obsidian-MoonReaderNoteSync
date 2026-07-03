@@ -20,7 +20,7 @@ export class TemplateBuilderUI {
         leftPanel.setCssStyles({ gap: '6px' });
 
         leftPanel.createEl('h4', { text: 'Available Fields' });
-        leftPanel.createEl('small', { text: 'Drag or click', cls: 'setting-item-description' }).style.marginBottom = '4px';
+        leftPanel.createEl('small', { text: 'Drag or click', cls: 'setting-item-description' }).setCssStyles({ marginBottom: '4px' });
 
         const fields = [
             { id: '{bookName}', name: 'Book Name', desc: 'Title of the book' },
@@ -41,7 +41,7 @@ export class TemplateBuilderUI {
         rightPanel.setCssStyles({ flexDirection: 'column' });
         rightPanel.setCssStyles({ gap: '15px' });
 
-        const editorTitle = rightPanel.createEl('h4', { text: 'Template Editor' });
+        rightPanel.createEl('h4', { text: 'Template Editor' });
         
         const textArea = rightPanel.createEl('textarea', { cls: 'moonreader-template-textarea' });
         textArea.setCssStyles({ width: '100%' });
@@ -97,7 +97,7 @@ export class TemplateBuilderUI {
             fieldEl.setCssStyles({ textAlign: 'center' });
             fieldEl.setCssStyles({ color: 'var(--text-muted)' });
             fieldEl.title = f.name + ": " + f.desc; // 榧犳爣鎮诞鏃舵樉绀烘彁绀?            
-            fieldEl.createEl('strong', { text: f.id }).style.fontSize = '0.9em';
+            fieldEl.createEl('strong', { text: f.id }).setCssStyles({ fontSize: '0.9em' });
 
             // Make draggable
             fieldEl.draggable = true;

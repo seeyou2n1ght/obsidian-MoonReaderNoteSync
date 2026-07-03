@@ -43,7 +43,7 @@ export class WebDAVClient {
         if (!password) {
             throw new Error("Decrypted password is empty! The AES key might have changed. Please re-enter your password in the settings.");
         }
-        const token = btoa();
+        const token = btoa(`${this.username}:${password}`);
         return {
             'Authorization': `Basic ${token}`,
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -81,7 +81,7 @@ export class WebDAVClient {
 
         const headers = await this.getAuthHeader(rawUrl);
         
-        // 我们采取双重保障：先尝试标准�?Encoded URL，若�?Alist �?403 拒绝，则回退�?Raw URL�?
+        // 鎴戜滑閲囧彇鍙岄噸淇濋殰锛氬厛灏濊瘯鏍囧噯鐨?Encoded URL锛岃嫢琚?Alist 鎶?403 鎷掔粷锛屽垯鍥為€€鍒?Raw URL銆?
         let response;
         try {
             console.log("PROPFIND requesting encoded URL:", encodedUrl);
@@ -94,7 +94,7 @@ export class WebDAVClient {
                     'Accept': '*/*'
                 }
             });
-        } catch {
+        } catch (e: unknown) {
             console.warn("PROPFIND with encoded URL failed. Retrying with raw URL...", e);
             response = await requestUrl({
                 url: rawUrl,
@@ -143,13 +143,13 @@ export class WebDAVClient {
 
     public async getFileBuffer(href: string): Promise<ArrayBuffer> {
         let fullUrl = href;
-        // 如果 href 只是一个绝对路�?(例如 /dav/folder/...an)
+        // 濡傛灉 href 鍙槸涓€涓粷瀵硅矾寰?(渚嬪 /dav/folder/...an)
         if (!href.startsWith('http')) {
             try {
                 const baseUrl = new URL(this.url);
                 fullUrl = baseUrl.origin + (href.startsWith('/') ? href : '/' + href);
-            } catch (e) {
-                // 回退处理
+            } catch {
+                // 鍥為€€澶勭悊
                 fullUrl = this.url + (href.startsWith('/') ? href.substring(1) : href);
             }
         }

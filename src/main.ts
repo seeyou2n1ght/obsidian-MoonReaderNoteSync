@@ -1,13 +1,13 @@
 import { Plugin, Notice, TFile, MarkdownView } from 'obsidian';
 import { MoonReaderSyncSettings, DEFAULT_SETTINGS } from './settings';
 import { MoonReaderWebDAVSettingTab } from './ui/settingTab';
-import { WebDAVClient } from './utils/webdav';
+import { WebDAVClient, WebDAVFile } from './utils/webdav';
 import { AnParser, MoonReaderNote } from './utils/anParser';
 import { BookSuggestModal, BookItem } from './ui/bookSuggestModal';
 import { CryptoHelper } from './utils/crypto';
 
 export default class MoonReaderSyncPlugin extends Plugin {
-    settings: MoonReaderSyncSettings;
+    settings!: MoonReaderSyncSettings;
 
     async onload() {
         CryptoHelper.init(this.app);
@@ -44,7 +44,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
             try {
                 const parsed = JSON.parse(data) as BookItem[];
                 // Invalidate poisoned cache from older buggy parsers
-                if (parsed.length > 0 && parsed[0].notes && parsed[0].notes.length > 0 && parsed[0].notes[0].originalPath !== undefined) {
+                if (parsed.length > 0 && parsed[0].notes && parsed[0].notes.length > 0 && 'originalPath' in parsed[0].notes[0]) {
                     console.log("Found outdated cache format. Invalidating cache.");
                     return [];
                 }
@@ -117,7 +117,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
                         contentLength: file.contentLength
                     });
                     updatedCount++;
-                } catch {
+                } catch (e: unknown) {
                     console.error("Failed to fetch/parse", file.href, e);
                 }
             }

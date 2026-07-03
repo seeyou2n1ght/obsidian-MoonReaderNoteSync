@@ -1,4 +1,4 @@
-import { App, SuggestModal, setIcon, activeDocument } from 'obsidian';
+import { App, SuggestModal, setIcon } from 'obsidian';
 import MoonReaderSyncPlugin from '../main';
 import { MoonReaderNote } from '../utils/anParser';
 import { TemplateModal } from './templateModal';
@@ -80,23 +80,28 @@ export class BookSuggestModal extends SuggestModal<BookItem> {
     async showPreview(item: BookItem, el: HTMLElement) {
         if (this.previewEl) this.hidePreview();
         
-        this.previewEl = activeDocument.body.createDiv({ cls: "moonreader-preview-popover popover" });
-        this.previewEl.setCssStyles({ position: "absolute" });
-        this.previewEl.setCssStyles({ zIndex: "1000" });
-        this.previewEl.setCssStyles({ width: "400px" });
-        this.previewEl.setCssStyles({ maxHeight: "300px" });
-        this.previewEl.setCssStyles({ overflow: "auto" });
-        this.previewEl.setCssStyles({ padding: "10px" });
-        this.previewEl.setCssStyles({ backgroundColor: "var(--background-primary)" });
-        this.previewEl.setCssStyles({ border: "1px solid var(--background-modifier-border)" });
-        this.previewEl.setCssStyles({ borderRadius: "5px" });
-        this.previewEl.setCssStyles({ boxShadow: "0 4px 10px rgba(0,0,0,0.5)" });
+        const body = activeDocument.body;
+        if (!body) return;
+
+        const previewEl = body.createDiv({ cls: "moonreader-preview-popover popover" });
+        this.previewEl = previewEl;
+
+        previewEl.setCssStyles({ position: "absolute" });
+        previewEl.setCssStyles({ zIndex: "1000" });
+        previewEl.setCssStyles({ width: "400px" });
+        previewEl.setCssStyles({ maxHeight: "300px" });
+        previewEl.setCssStyles({ overflow: "auto" });
+        previewEl.setCssStyles({ padding: "10px" });
+        previewEl.setCssStyles({ backgroundColor: "var(--background-primary)" });
+        previewEl.setCssStyles({ border: "1px solid var(--background-modifier-border)" });
+        previewEl.setCssStyles({ borderRadius: "5px" });
+        previewEl.setCssStyles({ boxShadow: "0 4px 10px rgba(0,0,0,0.5)" });
         
         const rect = el.getBoundingClientRect();
-        this.previewEl.setCssStyles({ top: `${rect.top}px` });
-        this.previewEl.setCssStyles({ left: `${rect.right + 10}px` });
+        previewEl.setCssStyles({ top: `${rect.top}px` });
+        previewEl.setCssStyles({ left: `${rect.right + 10}px` });
 
-        this.previewEl.createEl("div", { text: "Loading preview...", cls: "moonreader-preview-loading" });
+        previewEl.createEl("div", { text: "Loading preview...", cls: "moonreader-preview-loading" });
         
         try {
             const previewText = await this.plugin.getPreviewText(item);
@@ -106,7 +111,7 @@ export class BookSuggestModal extends SuggestModal<BookItem> {
                 pre.setCssStyles({ whiteSpace: "pre-wrap" });
                 pre.innerText = previewText;
             }
-        } catch(e) {
+        } catch {
             if (this.previewEl) {
                 this.previewEl.empty();
                 this.previewEl.createEl("div", { text: "Failed to load preview." });

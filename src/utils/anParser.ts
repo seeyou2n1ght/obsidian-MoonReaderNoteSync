@@ -62,7 +62,7 @@ export class AnParser {
                         id: annId.toString()
                     });
                 }
-            } catch (e) {
+            } catch {
                 // Defensive block skipping: isolates corrupted blocks
             }
             

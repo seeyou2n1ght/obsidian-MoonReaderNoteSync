@@ -112,8 +112,8 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
                 .addOption('append', 'Always Append')
                 .addOption('overwrite', 'Always Overwrite (Preserves Frontmatter)')
                 .setValue(this.plugin.settings.insertAction)
-                .onChange((value: "ask"|"append"|"overwrite") => {
-                    this.plugin.settings.insertAction = value;
+                .onChange((value: string) => {
+                    this.plugin.settings.insertAction = value as "ask"|"append"|"overwrite";
                     void this.plugin.saveSettings();
                 }));
 

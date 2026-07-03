@@ -1,7 +1,6 @@
 import { Platform, App, DataAdapter, arrayBufferToBase64, base64ToArrayBuffer } from 'obsidian';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare const require: (module: string) => any;
+declare const require: (module: string) => unknown;
 
 interface FSModule {
     existsSync(path: string): boolean;
@@ -12,10 +11,9 @@ interface FSModule {
 let fsModule: FSModule | null = null;
 if (!Platform.isMobile) {
     try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        fsModule = require('fs');
-    } catch (e) {
-        console.warn("Node fs module load error", e);
+        fsModule = require('fs') as FSModule;
+    } catch {
+        console.warn("Node fs module load error");
     }
 }
 
@@ -107,7 +105,7 @@ export class CryptoHelper {
             encoded
         );
         
-        const ivBase64 = arrayBufferToBase64(iv.buffer as ArrayBuffer);
+        const ivBase64 = arrayBufferToBase64(iv.buffer);
         const cipherBase64 = arrayBufferToBase64(cipherText);
         return ivBase64 + ":" + cipherBase64;
     }

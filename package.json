@@ -1,6 +1,6 @@
 {
   "name": "ob-moonreadernotesync",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -14,7 +14,6 @@
   "devDependencies": {
     "@types/node": "^25.9.1",
     "@types/pako": "^2.0.4",
-    "builtin-modules": "^5.2.0",
     "esbuild": "^0.28.0",
     "obsidian": "^1.12.3",
     "pako": "^2.1.0",
