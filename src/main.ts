@@ -49,7 +49,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
                     return [];
                 }
                 return parsed;
-            } catch (e) {
+            } catch {
                 return [];
             }
         }
