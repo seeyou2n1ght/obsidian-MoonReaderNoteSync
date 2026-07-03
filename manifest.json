@@ -1,7 +1,7 @@
 {
   "id": "obsidian-moonreader-sync",
   "name": "MoonReader Note Sync",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "minAppVersion": "1.4.0",
   "description": "Sync MoonReader reading notes via WebDAV and parse .an files directly into your Vault.",
   "author": "Morgan Lyu",
