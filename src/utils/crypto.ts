@@ -1,4 +1,4 @@
-import { Platform, App, DataAdapter, arrayBufferToBase64, base64ToArrayBuffer } from 'obsidian';
+import { App, DataAdapter, arrayBufferToBase64, base64ToArrayBuffer } from 'obsidian';
 
 export class CryptoHelper {
     private static adapter: DataAdapter | null = null;
