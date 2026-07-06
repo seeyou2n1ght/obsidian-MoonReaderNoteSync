@@ -3,6 +3,7 @@ import MoonReaderSyncPlugin from '../main';
 import { MoonReaderNote } from '../utils/anParser';
 import { TemplateModal } from './templateModal';
 import { FileSuggestModal } from './fileSuggestModal';
+import { ActionSuggestModal } from './actionSuggestModal';
 
 export interface BookItem {
     fileHref: string;
@@ -134,7 +135,16 @@ export class BookSuggestModal extends SuggestModal<BookItem> {
     onChooseSuggestion(item: BookItem, evt: MouseEvent | KeyboardEvent) {
         if (evt.shiftKey) {
             new TemplateModal(this.app, this.plugin, item).open();
+            return;
+        }
+
+        const action = this.plugin.settings.insertAction;
+        if (action === "ask") {
+            new ActionSuggestModal(this.app, this.plugin, item).open();
+        } else if (action === "append" || action === "overwrite") {
+            new FileSuggestModal(this.app, this.plugin, item, this.plugin.settings.noteTemplate, action).open();
         } else {
+            // Default fallback
             void this.plugin.importBookToCursor(item, this.plugin.settings.noteTemplate);
         }
     }

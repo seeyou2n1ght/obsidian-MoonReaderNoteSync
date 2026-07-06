@@ -6,12 +6,14 @@ export class FileSuggestModal extends SuggestModal<string> {
     plugin: MoonReaderSyncPlugin;
     bookItem: BookItem;
     template: string;
+    overrideAction?: "append" | "overwrite";
 
-    constructor(app: App, plugin: MoonReaderSyncPlugin, bookItem: BookItem, template: string) {
+    constructor(app: App, plugin: MoonReaderSyncPlugin, bookItem: BookItem, template: string, overrideAction?: "append" | "overwrite") {
         super(app);
         this.plugin = plugin;
         this.bookItem = bookItem;
         this.template = template;
+        this.overrideAction = overrideAction;
         this.setPlaceholder("Select a note to insert into...");
     }
 
@@ -32,7 +34,7 @@ export class FileSuggestModal extends SuggestModal<string> {
     onChooseSuggestion(path: string, evt: MouseEvent | KeyboardEvent) {
         const file = this.app.vault.getAbstractFileByPath(path);
         if (file instanceof TFile) {
-            void this.plugin.importBookToFile(this.bookItem, this.template, file);
+            void this.plugin.importBookToFile(this.bookItem, this.template, file, this.overrideAction);
         }
     }
 }

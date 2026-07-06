@@ -185,13 +185,13 @@ export default class MoonReaderSyncPlugin extends Plugin {
         }
     }
 
-    async importBookToFile(item: BookItem, template: string, file: TFile) {
+    async importBookToFile(item: BookItem, template: string, file: TFile, overrideAction?: "append" | "overwrite") {
         new Notice(`Importing ${item.bookName} to ${file.basename}...`);
         const textToInsert = this.renderNotes(item.notes, template);
         
         const content = await this.app.vault.read(file);
         
-        let action = this.settings.insertAction;
+        let action = overrideAction || this.settings.insertAction;
         
         if (action === "overwrite") {
             const frontmatterRegex = /^---\r?\n[\s\S]*?\r?\n---\r?\n/;
