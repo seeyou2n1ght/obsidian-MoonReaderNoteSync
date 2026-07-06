@@ -2,81 +2,91 @@
 
 [![GitHub Release](https://img.shields.io/github/v/release/seeyou2n1ght/obsidian-MoonReaderNoteSync)](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases) [![GitHub Repo stars](https://img.shields.io/github/stars/seeyou2n1ght/obsidian-MoonReaderNoteSync)](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync)
 
-This is an Obsidian plugin to synchronize, parse, and import your Moon+ Reader highlights and notes (`.an` binary files) into your local Vault via the WebDAV protocol.
+An Obsidian plugin to synchronize and import your Moon+ Reader highlights and notes (`.an` files) into your local Vault via WebDAV.
 
-## Core Features
+## Features
 
-* **Incremental Sync:** Uses PROPFIND requests to compare WebDAV metadata, only downloading and parsing files that have new notes, reducing network and memory overhead.
-* **Native Secure Storage:** Leverages Obsidian's native `SecretStorage` API to securely store your WebDAV password directly in your OS-level keychain/credential manager.
-* **Offline Cache Fallback:** Automatically reads local historical cache data when the network is down or the server is unreachable, ensuring continuous data imports.
-* **Structured Parsing Engine:** Integrates a decompression library to parse `.an` binary files, extracting book metadata, highlighted text, and personal annotations.
-* **Visual Template Builder:** Provides an intuitive drag-and-drop UI editor to design your markdown templates using placeholder variables, with real-time preview support.
+- **Incremental Sync**: Uses PROPFIND requests to compare WebDAV metadata. Only downloads and parses files that have been modified.
+- **Native Secure Storage**: Uses Obsidian's `SecretStorage` API. WebDAV passwords are kept in your OS-level keychain, not in plain text.
+- **Offline Cache**: Automatically falls back to locally cached data when the network or server is unreachable.
+- **Insert Modes**: Choose how notes are inserted—at the current cursor, appended to a specific file, or overwriting a specific file (preserving frontmatter).
+- **Template Builder**: A drag-and-drop UI editor in the settings to customize how highlights and annotations are formatted.
 
 ## Installation
 
-You can install this plugin manually via the following steps:
-1. Download the latest release (`main.js`, `manifest.json`, and `styles.css`) from the [GitHub Releases](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases) page.
-2. Create a folder named `obsidian-moonreader-sync` under your local Vault's `.obsidian/plugins/` directory, and move the downloaded files into it.
-3. Open the Obsidian client, go to **Settings > Community Plugins**, disable "Safe Mode" if enabled, and toggle on this plugin to enable it.
-
-*(Note: It will be available in the Obsidian Community Plugin store once the review is passed.)*
+1. Download the latest `main.js`, `manifest.json`, and `styles.css` from the [GitHub Releases](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases) page.
+2. Create a folder named `obsidian-moonreader-sync` under `.obsidian/plugins/` in your Vault, and place the downloaded files there.
+3. Open Obsidian **Settings > Community Plugins**, disable "Safe Mode", and enable this plugin.
 
 ## Usage
 
-1. Click the **sync icon** (Cloud Download) in the Obsidian left ribbon, or execute the **`Sync Notes (Smart)`** command in the command palette.
-2. After the incremental sync is completed, a search panel will pop up listing your available books.
-3. Search and select your target book. 
-   - **Press `Enter`** to insert the formatted notes directly at your current cursor position in the active editor.
-   - **Press `Shift + Enter`** to open the template editor for the selected book.
-   - You can also click the dedicated action buttons when hovering over a book item to insert it into a specific note.
+1. Click the **book sync icon** in the left ribbon, or use the **`Sync Notes (Smart)`** command.
+2. A search panel will appear showing your available books.
+3. Select a book:
+   - **Press `Enter`**: Triggers your default insert action (configurable in settings to ask, append, or overwrite).
+   - **Press `Shift + Enter`**: Opens the template editor for the selected book before inserting.
+   - **Hover Actions**: Use the mouse to specifically insert at the cursor, append to a file, or edit the template.
 
-## Configuration Guide
+## Configuration
 
-### 1. Security & WebDAV
-- Open the plugin settings panel.
-- Enter your WebDAV server endpoint pointing to the Moon+ Reader backup directory (e.g. `https://your-server.com/dav/Books/.Moon+/Cache/`).
-- Enter your WebDAV username and password (the password will be stored securely in the native OS Keychain).
+### 1. WebDAV Configuration
+- Go to the plugin settings.
+- Enter your WebDAV URL pointing to the Moon+ Reader cache folder (e.g., `https://your-server.com/dav/Books/.Moon+/Cache/`).
+- Enter your username and password. Click **Test Connection** to verify.
 
-### 2. Template Configuration
-- Navigate to the **Template Builder** section in settings.
-- Drag and drop available fields from the left panel into the text area to design your note format.
-- Preview the markdown rendering result in real-time at the bottom.
+### 2. Import Behavior
+- Configure whether to show a floating preview of the notes on hover.
+- Choose the **Default Insert Action** when pressing `Enter`:
+  - **Ask Every Time**: Prompts you to insert at cursor, append, or overwrite.
+  - **Always Append**: Directly opens a file selector to append notes.
+  - **Always Overwrite**: Directly opens a file selector to overwrite notes (preserves existing YAML frontmatter).
+
+### 3. Note Template Design
+- Use the **Template Builder** in settings.
+- Drag and drop variables to design the markdown layout. Click **Restore Default Template** if needed.
 
 ## Template Variables
 
-| Placeholder | Description |
+| Variable | Description |
 | :--- | :--- |
 | `{bookName}` | Book name |
 | `{chapter}` | Chapter name or index |
-| `{highlightText}` | Highlighted text content |
-| `{note}` | User's personal note/annotation |
+| `{highlightText}` | Highlighted text |
+| `{note}` | Your personal annotation |
 | `{color}` | Hex color code of the highlight |
 | `{timestamp}` | Original timestamp of the note |
 | `{id}` | Unique identifier for the note |
 
 ---
 
-## 🇨🇳 中文说明 (Chinese Description)
+## 🇨🇳 中文说明
 
-这是一个 Obsidian 插件，用于通过 WebDAV 协议同步、解析并将静读天下（Moon+ Reader）的阅读高亮与笔记（`.an` 二进制文件）导入到本地 Vault 库中。
+一个通过 WebDAV 协议同步、解析并将静读天下（Moon+ Reader）的高亮与笔记（`.an` 文件）导入本地 Obsidian 库的插件。
 
-### 核心特性
-* **增量数据同步**：通过 PROPFIND 请求对比 WebDAV 元数据，仅下载并解析产生新笔记的书籍文件，降低网络和内存开销。
-* **原生安全存储**：利用 Obsidian 原生的 `SecretStorage` API，将 WebDAV 凭证安全地存储在操作系统的密码保险柜中，彻底告别明文泄漏风险。
-* **离线缓存降级**：在网络故障或服务器不可达时，自动读取本地历史缓存数据，维持数据导入的连续性。
-* **结构化解析引擎**：集成解压库将二进制文件解压，定位提取书籍元数据、高亮文本及个人批注。
-* **可视化模板配置**：提供直观的拖拽式 UI 编辑器，支持通过占位变量进行排版并在界面中实时预览渲染的文本。
+### 功能特性
+- **增量同步**：通过 WebDAV 元数据对比，仅下载有更新的笔记文件。
+- **原生安全存储**：调用 Obsidian 的 `SecretStorage` API，将 WebDAV 密码安全存入系统凭据管理器，不产生明文。
+- **离线缓存**：无网络连接时，自动读取本地历史缓存数据。
+- **灵活的插入模式**：支持插入至光标位置、追加到指定文件或覆盖指定文件（保留属性区）。
+- **模板编辑器**：内置拖拽式 UI 编辑器，支持自定义笔记排版及实时预览。
 
-### 安装指南
-1. 从 [GitHub Releases](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases) 页面下载最新版本的 `main.js`、`manifest.json` 与 `styles.css` 文件。
-2. 在本地 Vault 的插件存放路径 (`.obsidian/plugins/`) 下创建 `obsidian-moonreader-sync` 目录，并将下载的文件移入其中。
-3. 打开 Obsidian 客户端，在第三方插件的系统设置面板中启用本插件。
+### 安装
+1. 从 [GitHub Releases](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases) 下载最新版的 `main.js`、`manifest.json` 和 `styles.css`。
+2. 在 Vault 目录下的 `.obsidian/plugins/` 中创建 `obsidian-moonreader-sync` 文件夹，并将下载的文件放入。
+3. 在 Obsidian 设置的第三方插件页面中启用该插件。
 
-### 使用方法
-1. 点击 Obsidian 左侧边栏的同步操作图标，或在系统命令面板中执行 `Sync Notes` 关联指令。
-2. 系统在执行完增量同步比对后，会自动弹出可供检索的书籍列表面板。
-3. 搜索并选择目标书籍后按下回车键，对应的格式化笔记将直接插入至当前编辑器的光标位置。
-4. 可选：按住 `Shift + 回车`，可以在插入前临时编辑该书籍的模板。
+### 使用
+1. 点击左侧边栏的**书本同步图标**，或执行 `Sync Notes (Smart)` 命令。
+2. 数据比对完成后，在弹出的搜索面板中选择目标书籍。
+3. 操作方式：
+   - **回车 (`Enter`)**：执行你在设置中配置的默认操作（每次询问 / 自动追加 / 自动覆盖）。
+   - **`Shift + 回车`**：在插入前临时调整该书的模板。
+   - **鼠标悬浮**：可直接点击右侧图标进行插入光标、插入文件或编辑模板。
+
+### 配置说明
+1. **WebDAV 配置**：填写静读天下同步目录的 URL（如 `.../.Moon+/Cache/`）及账密。点击 `Test Connection` 验证。
+2. **导入行为**：设置默认插入动作。若设为“每次询问”，则回车后会弹出选择菜单；若设为“追加”或“覆盖”，则直接弹出文件选择器。
+3. **模板设计**：在底部的编辑器中拖拽变量。如需重置，可点击恢复默认模板按钮。
 
 ### 开源许可证
-本项目基于 ISC 许可证开源。
+ISC License
