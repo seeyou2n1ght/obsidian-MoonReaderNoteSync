@@ -41,7 +41,7 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Password')
-            .setDesc('Securely stored in OS-level native Keychain / Credential Manager.')
+            .setDesc('Your password is kept secure in the OS keychain (macOS/iOS Keychain, Windows Credential Manager, Android Keystore) and will NOT be synced in plaintext via data.json.')
             .addText(text => {
                 text.inputEl.type = 'password';
                 const hasPassword = this.app.secretStorage && this.app.secretStorage.getSecret("webdav-password");
