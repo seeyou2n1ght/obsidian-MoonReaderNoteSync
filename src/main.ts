@@ -4,14 +4,11 @@ import { MoonReaderWebDAVSettingTab } from './ui/settingTab';
 import { WebDAVClient, WebDAVFile } from './utils/webdav';
 import { AnParser, MoonReaderNote } from './utils/anParser';
 import { BookSuggestModal, BookItem } from './ui/bookSuggestModal';
-import { CryptoHelper } from './utils/crypto';
 
 export default class MoonReaderSyncPlugin extends Plugin {
     settings!: MoonReaderSyncSettings;
 
     async onload() {
-        CryptoHelper.init(this.app);
-        
         await this.loadSettings();
 
         this.addSettingTab(new MoonReaderWebDAVSettingTab(this.app, this));
@@ -62,8 +59,13 @@ export default class MoonReaderSyncPlugin extends Plugin {
     }
 
     async pullNotesCommand() {
-        if (!this.settings.webDavUrl || !this.settings.username || !this.settings.encryptedPass || !this.settings.keyFilePath) {
-            new Notice("Please configure WebDAV settings and local key first.");
+        if (!this.settings.webDavUrl || !this.settings.username) {
+            new Notice("Please configure WebDAV settings first.");
+            return;
+        }
+
+        if (this.app.secretStorage && !this.app.secretStorage.getSecret("webdav-password")) {
+            new Notice("Please configure your WebDAV password in settings.");
             return;
         }
 
@@ -73,7 +75,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
             cacheMap.set(b.fileHref, b);
         }
 
-        const client = new WebDAVClient(this.settings.webDavUrl, this.settings.username, this.settings.encryptedPass, this.settings.keyFilePath);
+        const client = new WebDAVClient(this.app, this.settings.webDavUrl, this.settings.username);
         
         let anFiles: WebDAVFile[] = [];
         try {

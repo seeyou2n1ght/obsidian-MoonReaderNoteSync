@@ -1,6 +1,5 @@
 import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import MoonReaderSyncPlugin from '../main';
-import { CryptoHelper } from '../utils/crypto';
 import { TemplateBuilderUI } from './templateBuilder';
 
 export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
@@ -17,37 +16,8 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
 
         new Setting(containerEl).setName('').setHeading();
 
-        // Security
-        new Setting(containerEl).setName('').setHeading();
-        new Setting(containerEl)
-            .setName('Local AES Key Path')
-            .setDesc('Path to store the AES key. Must be OUTSIDE the Vault for security. E.g., C:/Users/name/.moonreader_key')
-            .addText(text => text
-                .setPlaceholder('Enter path for key')
-                .setValue(this.plugin.settings.keyFilePath)
-                .onChange((value) => {
-                    this.plugin.settings.keyFilePath = value;
-                    void this.plugin.saveSettings();
-                })
-            )
-            .addButton(btn => btn
-                .setButtonText('Generate Key')
-                .onClick(async () => {
-                    if (!this.plugin.settings.keyFilePath) {
-                        new Notice("Please enter a key path first!");
-                        return;
-                    }
-                    const success = await CryptoHelper.generateAndSaveKey(this.plugin.settings.keyFilePath);
-                    if (success) {
-                        new Notice(`Key generated and saved to ${this.plugin.settings.keyFilePath}`);
-                    } else {
-                        new Notice("Failed to generate key. Check console for details.");
-                    }
-                })
-            );
-
         // WebDAV
-        new Setting(containerEl).setName('').setHeading();
+        new Setting(containerEl).setName('WebDAV Sync Settings').setHeading();
         
         new Setting(containerEl)
             .setName('WebDAV URL')
@@ -71,23 +41,16 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Password')
-            .setDesc('Will be encrypted using the Local AES Key.')
+            .setDesc('Securely stored in OS-level native Keychain / Credential Manager.')
             .addText(text => {
                 text.inputEl.type = 'password';
-                text.setPlaceholder('Enter password');
+                const hasPassword = this.app.secretStorage && this.app.secretStorage.getSecret("webdav-password");
+                text.setPlaceholder(hasPassword ? 'Password configured (type to replace)' : 'Enter password');
+                
                 text.onChange((value) => {
-                    if (value && this.plugin.settings.keyFilePath) {
-                        CryptoHelper.encrypt(value, this.plugin.settings.keyFilePath)
-                            .then(encrypted => {
-                                this.plugin.settings.encryptedPass = encrypted;
-                                void this.plugin.saveSettings();
-                                new Notice("Password encrypted and saved.");
-                            })
-                            .catch(() => {
-                                new Notice("Failed to encrypt password. Is the key path valid?");
-                            });
-                    } else if (value && !this.plugin.settings.keyFilePath) {
-                        new Notice("Please configure Local AES Key Path first.");
+                    if (value && this.app.secretStorage) {
+                        this.app.secretStorage.setSecret("webdav-password", value);
+                        new Notice("Password saved to native Keychain.");
                     }
                 });
             });

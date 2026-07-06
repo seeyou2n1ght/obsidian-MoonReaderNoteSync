@@ -1,6 +1,4 @@
-import { requestUrl } from 'obsidian';
-import { CryptoHelper } from './crypto';
-
+import { requestUrl, App } from 'obsidian';
 export interface WebDAVFile {
     href: string;
     lastModified: string;
@@ -10,21 +8,19 @@ export interface WebDAVFile {
 }
 
 export class WebDAVClient {
+    private app: App;
     private url: string;
     private username: string;
-    private encryptedPass: string;
-    private keyPath: string;
 
-    constructor(url: string, username: string, encryptedPass: string, keyPath: string) {
+    constructor(app: App, url: string, username: string) {
+        this.app = app;
         this.url = url.endsWith('/') ? url : url + '/';
         this.username = username;
-        this.encryptedPass = encryptedPass;
-        this.keyPath = keyPath;
     }
 
     private async getAuthHeader(targetUrl?: string): Promise<Record<string, string>> {
-        if (!this.username || !this.encryptedPass) return {};
-        
+        if (!this.username) return {};
+
         if (targetUrl) {
             try {
                 const targetOrigin = new URL(targetUrl).origin;
@@ -39,9 +35,9 @@ export class WebDAVClient {
             }
         }
 
-        const password = await CryptoHelper.decrypt(this.encryptedPass, this.keyPath);
+        const password = this.app.secretStorage ? this.app.secretStorage.getSecret("webdav-password") : null;
         if (!password) {
-            throw new Error("Decrypted password is empty! The AES key might have changed. Please re-enter your password in the settings.");
+            throw new Error("Password not found in secure storage. Please set your password in the settings.");
         }
         const token = btoa(`${this.username}:${password}`);
         return {
