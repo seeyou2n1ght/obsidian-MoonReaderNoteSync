@@ -21,7 +21,7 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
         new Setting(containerEl)
             .setName('WebDAV URL')
             .setDesc((() => {
-                const frag = document.createDocumentFragment();
+                const frag = activeDocument.createDocumentFragment();
                 frag.appendText('Full URL to the folder containing your .an files. ');
                 frag.createEl('a', { 
                     text: 'How to configure?', 
