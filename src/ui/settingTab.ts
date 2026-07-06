@@ -1,6 +1,7 @@
 import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import MoonReaderSyncPlugin from '../main';
 import { TemplateBuilderUI } from './templateBuilder';
+import { DEFAULT_SETTINGS } from '../settings';
 
 export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
     plugin: MoonReaderSyncPlugin;
@@ -14,14 +15,20 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
         const {containerEl} = this;
         containerEl.empty();
 
-        new Setting(containerEl).setName('').setHeading();
-
         // WebDAV
-        new Setting(containerEl).setName('WebDAV Sync Settings').setHeading();
+        new Setting(containerEl).setName('🌐 WebDAV Configuration').setHeading();
         
         new Setting(containerEl)
             .setName('WebDAV URL')
-            .setDesc('Full URL to the folder containing your .an files (e.g. https://.../dav/Books/.Moon+/Cache)')
+            .setDesc((() => {
+                const frag = document.createDocumentFragment();
+                frag.appendText('Full URL to the folder containing your .an files. ');
+                frag.createEl('a', { 
+                    text: 'How to configure?', 
+                    href: 'https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync#1-security--webdav'
+                });
+                return frag;
+            })())
             .addText(text => text
                 .setPlaceholder('https://dav.server.com/dav/Books/.Notes/')
                 .setValue(this.plugin.settings.webDavUrl)
@@ -60,6 +67,7 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
             .setDesc('Verify your WebDAV URL and credentials')
             .addButton(btn => btn
                 .setButtonText('Test Connection')
+                .setCta()
                 .onClick(async () => {
                     btn.setButtonText('Testing...');
                     const { WebDAVClient } = await import('../utils/webdav');
@@ -75,7 +83,7 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
             );
 
         // UI & Behavior
-        new Setting(containerEl).setName('').setHeading();
+        new Setting(containerEl).setName('⚙️ Import Behavior').setHeading();
         
         new Setting(containerEl)
             .setName('Enable Hover Preview')
@@ -100,7 +108,7 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
                 }));
 
         // Template
-        new Setting(containerEl).setName('').setHeading();
+        new Setting(containerEl).setName('🎨 Note Template Design').setHeading();
         
         TemplateBuilderUI.build(
             containerEl, 
@@ -112,5 +120,19 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
                 void this.plugin.saveSettings();
             }
         );
+
+        new Setting(containerEl)
+            .setName('Restore Default Template')
+            .setDesc('Reset the template back to the default factory settings.')
+            .addButton(btn => btn
+                .setButtonText('Restore')
+                .setWarning()
+                .onClick(async () => {
+                    this.plugin.settings.noteTemplate = DEFAULT_SETTINGS.noteTemplate;
+                    await this.plugin.saveSettings();
+                    this.display();
+                    new Notice("Template restored to default.");
+                })
+            );
     }
 }
