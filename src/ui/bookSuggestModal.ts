@@ -81,7 +81,7 @@ export class BookSuggestModal extends SuggestModal<BookItem> {
     async showPreview(item: BookItem, el: HTMLElement) {
         if (this.previewEl) this.hidePreview();
         
-        const body = activeDocument.body;
+        const body = activeWindow.document.body;
         if (!body) return;
 
         const previewEl = body.createDiv({ cls: "moonreader-preview-popover popover" });
