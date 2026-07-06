@@ -13,7 +13,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
 
         this.addSettingTab(new MoonReaderWebDAVSettingTab(this.app, this));
 
-        this.addRibbonIcon('cloud-download', 'Sync MoonReader Notes', () => {
+        this.addRibbonIcon('book-down', 'Sync MoonReader Notes', () => {
             void this.pullNotesCommand();
         });
 
