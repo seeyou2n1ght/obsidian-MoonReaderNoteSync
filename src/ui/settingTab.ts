@@ -55,6 +55,25 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
                 });
             });
 
+        new Setting(containerEl)
+            .setName('Test Connection')
+            .setDesc('Verify your WebDAV URL and credentials')
+            .addButton(btn => btn
+                .setButtonText('Test Connection')
+                .onClick(async () => {
+                    btn.setButtonText('Testing...');
+                    const { WebDAVClient } = await import('../utils/webdav');
+                    const client = new WebDAVClient(this.app, this.plugin.settings.webDavUrl, this.plugin.settings.username);
+                    const success = await client.testConnection();
+                    if (success) {
+                        new Notice("Connection successful!");
+                    } else {
+                        new Notice("Connection failed. Please check your URL, username, and password.");
+                    }
+                    btn.setButtonText('Test Connection');
+                })
+            );
+
         // UI & Behavior
         new Setting(containerEl).setName('').setHeading();
         
