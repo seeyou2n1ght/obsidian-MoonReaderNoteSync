@@ -1,11 +1,13 @@
 # MoonReader Note Sync for Obsidian
 
+[![GitHub Release](https://img.shields.io/github/v/release/seeyou2n1ght/obsidian-MoonReaderNoteSync)](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases) [![GitHub Repo stars](https://img.shields.io/github/stars/seeyou2n1ght/obsidian-MoonReaderNoteSync)](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync)
+
 This is an Obsidian plugin to synchronize, parse, and import your Moon+ Reader highlights and notes (`.an` binary files) into your local Vault via the WebDAV protocol.
 
 ## Core Features
 
 * **Incremental Sync:** Uses PROPFIND requests to compare WebDAV metadata, only downloading and parsing files that have new notes, reducing network and memory overhead.
-* **Secure Local Storage:** Encrypts WebDAV passwords using AES-256. The encryption key is securely stored in a local directory outside your Vault.
+* **Native Secure Storage:** Leverages Obsidian's native `SecretStorage` API to securely store your WebDAV password directly in your OS-level keychain/credential manager.
 * **Offline Cache Fallback:** Automatically reads local historical cache data when the network is down or the server is unreachable, ensuring continuous data imports.
 * **Structured Parsing Engine:** Integrates a decompression library to parse `.an` binary files, extracting book metadata, highlighted text, and personal annotations.
 * **Visual Template Builder:** Provides an intuitive drag-and-drop UI editor to design your markdown templates using placeholder variables, with real-time preview support.
@@ -13,8 +15,8 @@ This is an Obsidian plugin to synchronize, parse, and import your Moon+ Reader h
 ## Installation
 
 You can install this plugin manually via the following steps:
-1. Download the latest release `moonreader-note-sync.zip` from the GitHub Releases page, or manually download `main.js`, `manifest.json`, and `styles.css`.
-2. Create a folder named `obsidian-moonreader-sync` under your local Vault's `.obsidian/plugins/` directory, and extract/move the files into it.
+1. Download the latest release (`main.js`, `manifest.json`, and `styles.css`) from the [GitHub Releases](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases) page.
+2. Create a folder named `obsidian-moonreader-sync` under your local Vault's `.obsidian/plugins/` directory, and move the downloaded files into it.
 3. Open the Obsidian client, go to **Settings > Community Plugins**, disable "Safe Mode" if enabled, and toggle on this plugin to enable it.
 
 *(Note: It will be available in the Obsidian Community Plugin store once the review is passed.)*
@@ -32,9 +34,8 @@ You can install this plugin manually via the following steps:
 
 ### 1. Security & WebDAV
 - Open the plugin settings panel.
-- Specify a local path **outside** your Vault for the AES key (e.g., `C:/Users/name/.moonreader_key`) and click **Generate Key**.
 - Enter your WebDAV server endpoint pointing to the Moon+ Reader backup directory (e.g. `https://your-server.com/dav/Books/.Moon+/Cache/`).
-- Enter your WebDAV username and password (the password will be safely encrypted).
+- Enter your WebDAV username and password (the password will be stored securely in the native OS Keychain).
 
 ### 2. Template Configuration
 - Navigate to the **Template Builder** section in settings.
@@ -61,14 +62,14 @@ You can install this plugin manually via the following steps:
 
 ### 核心特性
 * **增量数据同步**：通过 PROPFIND 请求对比 WebDAV 元数据，仅下载并解析产生新笔记的书籍文件，降低网络和内存开销。
-* **本地安全存储**：使用 AES-256 算法加密 WebDAV 账户密码，加密密钥存储在当前 Vault 路径之外的本地安全目录。
+* **原生安全存储**：利用 Obsidian 原生的 `SecretStorage` API，将 WebDAV 凭证安全地存储在操作系统的密码保险柜中，彻底告别明文泄漏风险。
 * **离线缓存降级**：在网络故障或服务器不可达时，自动读取本地历史缓存数据，维持数据导入的连续性。
 * **结构化解析引擎**：集成解压库将二进制文件解压，定位提取书籍元数据、高亮文本及个人批注。
 * **可视化模板配置**：提供直观的拖拽式 UI 编辑器，支持通过占位变量进行排版并在界面中实时预览渲染的文本。
 
 ### 安装指南
-1. 下载最新版本的压缩包，或获取 `main.js`、`manifest.json` 与 `styles.css` 文件。
-2. 在本地 Vault 的插件存放路径 (`.obsidian/plugins/`) 下创建 `obsidian-moonreader-sync` 目录，并将解压后的文件移入其中。
+1. 从 [GitHub Releases](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases) 页面下载最新版本的 `main.js`、`manifest.json` 与 `styles.css` 文件。
+2. 在本地 Vault 的插件存放路径 (`.obsidian/plugins/`) 下创建 `obsidian-moonreader-sync` 目录，并将下载的文件移入其中。
 3. 打开 Obsidian 客户端，在第三方插件的系统设置面板中启用本插件。
 
 ### 使用方法
