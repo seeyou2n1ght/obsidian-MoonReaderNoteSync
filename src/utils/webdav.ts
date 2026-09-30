@@ -1,170 +1,79 @@
-import { requestUrl, RequestUrlParam } from 'obsidian';
-import { CryptoHelper } from './crypto';
+import { requestUrl } from 'obsidian';
+import { t, UserError } from '../i18n';
 
 export interface WebDAVFile {
     href: string;
     lastModified: string;
-    contentType: string;
     contentLength: number;
     isCollection: boolean;
 }
-
+export function normalizeWebDavUrl(value: string): string {
+    try {
+        const url = new URL(value.trim());
+        if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw new Error();
+        if (!url.pathname.endsWith('/')) url.pathname += '/';
+        return url.href;
+    } catch {
+        throw new UserError(t('请输入完整的 HTTP(S) WebDAV 目录地址，账号和密码请单独填写。', 'Enter a full HTTP(S) WebDAV folder URL; enter credentials separately.'));
+    }
+}
 export class WebDAVClient {
     private url: string;
-    private username: string;
-    private encryptedPass: string;
-    private keyPath: string;
-
-    constructor(url: string, username: string, encryptedPass: string, keyPath: string) {
-        this.url = url.endsWith('/') ? url : url + '/';
-        this.username = username;
-        this.encryptedPass = encryptedPass;
-        this.keyPath = keyPath;
+    constructor(url: string, private username: string, private password: string) {
+        this.url = normalizeWebDavUrl(url);
     }
-
-    private async getAuthHeader(targetUrl?: string): Promise<Record<string, string>> {
-        if (!this.username || !this.encryptedPass) return {};
-        
-        if (targetUrl) {
-            try {
-                const targetOrigin = new URL(targetUrl).origin;
-                const clientOrigin = new URL(this.url).origin;
-                if (targetOrigin !== clientOrigin) {
-                    console.warn("Target URL is not same-origin with WebDAV client. Stripping credentials.");
-                    return {};
-                }
-            } catch (e) {
-                console.error("Failed to parse URL for SSRF validation:", e);
-                return {};
+    // Test a draft without persisting credentials.
+    static testConnection(url: string, username: string, password: string): Promise<WebDAVFile[]> {
+        return new WebDAVClient(url, username, password).getFiles();
+    }
+    private async request(url: string, method: string) {
+        if (new URL(url).origin !== new URL(this.url).origin) {
+            throw new UserError(t('服务器返回了其他站点的文件地址，已停止下载。', 'The server returned a file on another site. Download stopped.'));
+        }
+        const password = this.password;
+        if (!password) throw new UserError(t('请填写 WebDAV 密码。', 'Enter your WebDAV password.'));
+        const response = await requestUrl({ url, method, throw: false, headers: {
+            Authorization: 'Basic ' + Buffer.from(this.username + ':' + password).toString('base64'),
+            ...(method === 'PROPFIND' ? { Depth: '1' } : {})
+        } });
+        if (response.status < 200 || response.status >= 300) throw Object.assign(new Error('WebDAV request failed'), { status: response.status });
+        return response;
+    }
+    async getFiles(): Promise<WebDAVFile[]> {
+        const response = await this.request(this.url, 'PROPFIND');
+        if (response.status !== 207) throw new UserError(t('服务器未返回 WebDAV 目录。请检查地址是否指向 WebDAV 服务。', 'The server did not return a WebDAV listing. Check the service URL.'));
+        const doc = new DOMParser().parseFromString(response.text, 'text/xml');
+        if (doc.getElementsByTagNameNS('*', 'parsererror').length || doc.documentElement.localName !== 'multistatus' || doc.documentElement.namespaceURI !== 'DAV:') {
+            throw new UserError(t('服务器目录响应无法解析。旧缓存已保留。', 'Cannot parse the server listing. The previous cache is preserved.'));
+        }
+        const text = (el: Element, name: string) => el.getElementsByTagNameNS('DAV:', name)[0]?.textContent || '';
+        const files = new Map<string, WebDAVFile>();
+        for (const res of Array.from(doc.documentElement.children).filter(el => el.localName === 'response')) {
+            if (res.namespaceURI !== 'DAV:') throw new UserError(t('目录包含无法识别的文件响应。旧缓存已保留。', 'The listing contains an unrecognized file response. The previous cache is preserved.'));
+            const href = text(res, 'href');
+            if (!href) throw new Error('Missing WebDAV href');
+            const props = Array.from(res.getElementsByTagNameNS('DAV:', 'propstat'))
+                .filter(p => /\s200(?:\s|$)/.test(text(p, 'status')))
+                .map(p => p.getElementsByTagNameNS('DAV:', 'prop')[0]).filter(Boolean);
+            if (!props.length) throw new UserError(t('部分文件元数据不可读。旧缓存已保留，请检查目录权限后重试。', 'Some file metadata is unavailable. The previous cache is preserved. Check folder permissions and retry.'));
+            const property = (name: string) => props.map(p => text(p, name)).find(Boolean) || '';
+            const length = property('getcontentlength');
+            const modified = property('getlastmodified');
+            const file: WebDAVFile = {
+                href: new URL(href, this.url).href,
+                lastModified: Number.isFinite(Date.parse(modified)) ? modified : '',
+                contentLength: /^\d+$/.test(length) && Number.isSafeInteger(Number(length)) ? Number(length) : -1,
+                isCollection: props.some(p => p.getElementsByTagNameNS('DAV:', 'collection').length > 0)
+            };
+            const previous = files.get(file.href);
+            if (previous && (previous.lastModified !== file.lastModified || previous.contentLength !== file.contentLength || previous.isCollection !== file.isCollection)) {
+                throw new UserError(t('同一文件返回了冲突的元数据。旧缓存已保留，请重试。', 'The server returned conflicting metadata for one file. Previous cache retained; retry the refresh.'));
             }
+            files.set(file.href, file);
         }
-
-        const password = await CryptoHelper.decrypt(this.encryptedPass, this.keyPath);
-        if (!password) {
-            throw new Error("Decrypted password is empty! The AES key might have changed. Please re-enter your password in the settings.");
-        }
-        const token = Buffer.from(`${this.username}:${password}`).toString('base64');
-        return {
-            'Authorization': `Basic ${token}`,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        };
+        return [...files.values()];
     }
-
-    public async testConnection(): Promise<boolean> {
-        try {
-            const headers = await this.getAuthHeader(this.url);
-            const response = await requestUrl({
-                url: this.url,
-                method: 'PROPFIND',
-                headers: {
-                    ...headers,
-                    'Depth': '0'
-                }
-            });
-            return response.status >= 200 && response.status < 300;
-        } catch (e) {
-            console.error("WebDAV connection test failed", e);
-            return false;
-        }
-    }
-
-    public async getFiles(): Promise<WebDAVFile[]> {
-        const rawUrl = this.url;
-        let encodedUrl = rawUrl;
-        try {
-            const urlObj = new URL(rawUrl);
-            urlObj.pathname = urlObj.pathname.split('/').map(s => encodeURIComponent(decodeURIComponent(s))).join('/');
-            encodedUrl = urlObj.toString();
-        } catch(e) {
-            console.error("URL parsing failed", e);
-        }
-
-        const headers = await this.getAuthHeader(rawUrl);
-        
-        // 我们采取双重保障：先尝试标准的 Encoded URL，若被 Alist 报 403 拒绝，则回退到 Raw URL。
-        let response;
-        try {
-            console.log("PROPFIND requesting encoded URL:", encodedUrl);
-            response = await requestUrl({
-                url: encodedUrl,
-                method: 'PROPFIND',
-                headers: {
-                    ...headers,
-                    'Depth': '1',
-                    'Accept': '*/*'
-                }
-            });
-        } catch (e: any) {
-            console.warn("PROPFIND with encoded URL failed. Retrying with raw URL...", e);
-            response = await requestUrl({
-                url: rawUrl,
-                method: 'PROPFIND',
-                headers: {
-                    ...headers,
-                    'Depth': '1',
-                    'Accept': '*/*'
-                }
-            });
-        }
-
-        if (response.status !== 207) {
-            throw new Error(`WebDAV PROPFIND failed with status: ${response.status}`);
-        }
-
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(response.text, "text/xml");
-        const responses = doc.getElementsByTagNameNS("*", "response");
-        
-        const files: WebDAVFile[] = [];
-        for (let i = 0; i < responses.length; i++) {
-            const res = responses[i];
-            const href = res.getElementsByTagNameNS("*", "href")[0]?.textContent || "";
-            const propstat = res.getElementsByTagNameNS("*", "propstat")[0];
-            if (!propstat) continue;
-            const prop = propstat.getElementsByTagNameNS("*", "prop")[0];
-            if (!prop) continue;
-            
-            const resType = prop.getElementsByTagNameNS("*", "resourcetype")[0];
-            const isCollection = resType && resType.getElementsByTagNameNS("*", "collection").length > 0;
-            const lastModified = prop.getElementsByTagNameNS("*", "getlastmodified")[0]?.textContent || "";
-            const contentType = prop.getElementsByTagNameNS("*", "getcontenttype")[0]?.textContent || "";
-            const contentLengthStr = prop.getElementsByTagNameNS("*", "getcontentlength")[0]?.textContent || "0";
-            
-            files.push({
-                href: decodeURIComponent(href),
-                lastModified,
-                contentType,
-                contentLength: parseInt(contentLengthStr, 10),
-                isCollection
-            });
-        }
-        return files;
-    }
-
-    public async getFileBuffer(href: string): Promise<ArrayBuffer> {
-        let fullUrl = href;
-        // 如果 href 只是一个绝对路径 (例如 /dav/folder/...an)
-        if (!href.startsWith('http')) {
-            try {
-                const baseUrl = new URL(this.url);
-                fullUrl = baseUrl.origin + (href.startsWith('/') ? href : '/' + href);
-            } catch (e) {
-                // 回退处理
-                fullUrl = this.url + (href.startsWith('/') ? href.substring(1) : href);
-            }
-        }
-
-        const headers = await this.getAuthHeader(fullUrl);
-        
-        const response = await requestUrl({
-            url: fullUrl,
-            method: 'GET',
-            headers
-        });
-        
-        if (response.status >= 200 && response.status < 300) {
-            return response.arrayBuffer;
-        }
-        throw new Error(`WebDAV GET failed with status: ${response.status}`);
+    async getFileBuffer(href: string): Promise<ArrayBuffer> {
+        return (await this.request(new URL(href, this.url).href, 'GET')).arrayBuffer;
     }
 }

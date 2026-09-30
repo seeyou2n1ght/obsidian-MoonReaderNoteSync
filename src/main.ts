@@ -1,207 +1,194 @@
-import { Plugin, Platform, Notice, TFile, MarkdownView } from 'obsidian';
+import { Plugin, FileSystemAdapter, MarkdownView, Modal } from 'obsidian';
+import { join } from 'path';
 import { MoonReaderSyncSettings, DEFAULT_SETTINGS } from './settings';
 import { MoonReaderWebDAVSettingTab } from './ui/settingTab';
-import { WebDAVClient } from './utils/webdav';
-import { AnParser, MoonReaderNote } from './utils/anParser';
-import { BookSuggestModal, BookItem } from './ui/bookSuggestModal';
-import { CryptoHelper } from './utils/crypto';
+import { WebDAVClient, normalizeWebDavUrl } from './utils/webdav';
+import { BookSuggestModal } from './ui/bookSuggestModal';
+import { randomUUID } from 'crypto';
+import { BookCache, readCache, writeCache, sourceId } from './utils/cache';
+import { renderNotes } from './utils/notes';
+import { syncBooks } from './utils/sync';
+import { t, errorMessage, UserError } from './i18n';
 
 export default class MoonReaderSyncPlugin extends Plugin {
-    settings: MoonReaderSyncSettings;
+    settings: MoonReaderSyncSettings = { ...DEFAULT_SETTINGS };
+    cache: BookCache = { version: 1, source: '', checkedAt: '', books: [] };
+    syncing = false;
+    connectionSaving = false;
+    status = '';
+    readonly listeners = new Set<() => void>();
+    readonly sessionImports = new Set<string>();
+    private recentMarkdownView: MarkdownView | null = null;
+    private saves: Promise<void> = Promise.resolve();
+    private settingsTab!: MoonReaderWebDAVSettingTab;
+    private browser: BookSuggestModal | null = null;
+    private connectionModal: Modal | null = null;
+    private disposed = false;
+    renderNotes = renderNotes;
 
     async onload() {
-        CryptoHelper.init(this.app);
-        
-        await this.loadSettings();
-
-        this.addSettingTab(new MoonReaderWebDAVSettingTab(this.app, this));
-
-        this.addRibbonIcon('cloud-download', 'Sync MoonReader Notes', () => {
-            this.pullNotesCommand();
-        });
-
-        this.addCommand({
-            id: 'pull-moonreader-notes',
-            name: 'Sync Notes (Smart)',
-            callback: () => {
-                this.pullNotesCommand();
-            }
-        });
+        const saved = await this.loadData() || {};
+        // Only current fields are retained; legacy ciphertext is never loaded or migrated.
+        this.settings = {
+            webDavUrl: saved.webDavUrl ?? DEFAULT_SETTINGS.webDavUrl,
+            username: saved.username ?? DEFAULT_SETTINGS.username,
+            secretId: saved.secretId ?? '',
+            insertAction: saved.insertAction ?? DEFAULT_SETTINGS.insertAction,
+            noteTemplate: saved.noteTemplate ?? DEFAULT_SETTINGS.noteTemplate
+        };
+        this.registerEvent(this.app.workspace.on('active-leaf-change', leaf => {
+            if (leaf?.view instanceof MarkdownView) this.recentMarkdownView = leaf.view;
+        }));
+        this.settingsTab = new MoonReaderWebDAVSettingTab(this.app, this);
+        this.addSettingTab(this.settingsTab);
+        await this.loadCache();
+        this.addRibbonIcon('library', t('静读天下笔记', 'MoonReader notes'), () => this.openLibrary());
+        this.addCommand({ id: 'pull-moonreader-notes', name: t('浏览和导入笔记', 'Browse and import notes'), callback: () => this.openLibrary() });
+        this.addCommand({ id: 'refresh-moonreader-notes', name: t('刷新远端笔记', 'Refresh remote notes'), callback: () => { this.openLibrary(false); void this.refresh(); } });
     }
-
-    async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    onunload() {
+        this.disposed = true;
+        this.browser?.close();
+        this.connectionModal?.close();
+        this.settingsTab.hide();
+        this.listeners.clear();
     }
-
-    async saveSettings() {
-        await this.saveData(this.settings);
+    configured(): boolean {
+        try { return !!(this.settings.webDavUrl && this.settings.username && this.settings.secretId && this.app.secretStorage.getSecret(this.settings.secretId)); }
+        catch { return false; }
     }
-
-    async loadCache(): Promise<BookItem[]> {
-        const cachePath = this.manifest.dir + '/moonreader_cache.json';
-        if (await this.app.vault.adapter.exists(cachePath)) {
-            const data = await this.app.vault.adapter.read(cachePath);
-            try {
-                const parsed = JSON.parse(data);
-                // Invalidate poisoned cache from older buggy parsers
-                if (parsed.length > 0 && parsed[0].notes && parsed[0].notes.length > 0 && parsed[0].notes[0].originalPath !== undefined) {
-                    console.log("Found outdated cache format. Invalidating cache.");
-                    return [];
-                }
-                return parsed;
-            } catch (e) {
-                return [];
-            }
+    connectionStatus(): string {
+        return this.configured() ? t('连接已保存', 'Connection saved') : this.settings.secretId ?
+            t('已保存的密码不可用，请重新输入并保存', 'Saved password unavailable; re-enter and save it') :
+            t('连接未配置，请输入密码并保存', 'Connection not configured; enter your password and save');
+    }
+    async saveConnection(webDavUrl: string, username: string, password: string, isActive: () => boolean) {
+        if (!isActive()) return;
+        if (this.settings.secretId && username === this.settings.username &&
+            new URL(webDavUrl).origin === new URL(this.settings.webDavUrl).origin &&
+            this.app.secretStorage.getSecret(this.settings.secretId) === password) {
+            await this.updateSettings({ webDavUrl, username });
+            this.notify(); return;
         }
-        return [];
-    }
-
-    async saveCache(books: BookItem[]) {
-        const cachePath = this.manifest.dir + '/moonreader_cache.json';
-        await this.app.vault.adapter.write(cachePath, JSON.stringify(books));
-    }
-
-    async pullNotesCommand() {
-        if (!this.settings.webDavUrl || !this.settings.username || !this.settings.encryptedPass || !this.settings.keyFilePath) {
-            new Notice("Please configure WebDAV settings and local key first.");
-            return;
-        }
-
-        const cachedBooks = await this.loadCache();
-        const cacheMap = new Map<string, BookItem>();
-        for (const b of cachedBooks) {
-            cacheMap.set(b.fileHref, b);
-        }
-
-        const client = new WebDAVClient(this.settings.webDavUrl, this.settings.username, this.settings.encryptedPass, this.settings.keyFilePath);
-        
-        let anFiles: WebDAVFile[] = [];
+        const secretId = 'moonreader-' + randomUUID();
         try {
-            const files = await client.getFiles();
-            anFiles = files.filter(f => f.href.endsWith('.an'));
-        } catch (e) {
-            console.error("WebDAV check failed", e);
-            if (cachedBooks.length > 0) {
-                new Notice("Network unavailable or 403. Opening from local cache.");
-                new BookSuggestModal(this.app, this, cachedBooks).open();
-                return;
-            } else {
-                new Notice("Failed to connect and no local cache available.");
-                return;
-            }
+            this.app.secretStorage.setSecret(secretId, password);
+            if (this.app.secretStorage.getSecret(secretId) !== password) throw new Error('Secret storage did not retain the credential');
+            if (!isActive()) { this.app.secretStorage.setSecret(secretId, ''); return; }
+            await this.updateSettings({ webDavUrl, username, secretId });
+        } catch (error) {
+            try { this.app.secretStorage.setSecret(secretId, ''); }
+            catch { throw new UserError(t('连接未更改，但新凭据清理失败。可在 Obsidian 密钥库中清理未使用的 moonreader 凭据。', 'Connection unchanged, but the unused credential could not be cleared. Manage unused moonreader entries in Obsidian Keychain.')); }
+            throw error;
         }
-
-        if (anFiles.length === 0) {
-            new Notice("No .an files found on WebDAV.");
-            return;
-        }
-
-        const books: BookItem[] = [];
-        let updatedCount = 0;
-
-        for (const file of anFiles) {
-            const cached = cacheMap.get(file.href);
-            // 增量检查：如果缓存存在且文件的修改时间和大小都没变，直接用缓存
-            if (cached && cached.lastModified === file.lastModified && cached.contentLength === file.contentLength) {
-                books.push(cached);
-            } else {
-                try {
-                    const buf = await client.getFileBuffer(file.href);
-                    const parsedNotes = AnParser.parseBuffer(buf);
-                    const bookName = parsedNotes.length > 0 ? parsedNotes[0].bookName : (file.href.split('/').pop() || "Unknown Book");
-                    books.push({ 
-                        fileHref: file.href, 
-                        bookName, 
-                        notes: parsedNotes,
-                        lastModified: file.lastModified,
-                        contentLength: file.contentLength
-                    });
-                    updatedCount++;
-                } catch(e) {
-                    console.error("Failed to fetch/parse", file.href, e);
+        this.notify();
+    }
+    private currentSource(): string {
+        return sourceId(normalizeWebDavUrl(this.settings.webDavUrl), this.settings.username);
+    }
+    private cachePath(source?: string): string {
+        const base = (this.app.vault.adapter as FileSystemAdapter).getBasePath();
+        return join(base, this.manifest.dir!, source ? 'moonreader_cache.' + source + '.json' : 'moonreader_cache.json');
+    }
+    async loadCache() {
+        try {
+            const source = this.currentSource();
+            this.cache = await readCache(this.cachePath(source), source, this.settings.webDavUrl);
+            if (!this.cache.checkedAt && !this.cache.books.length) {
+                const legacy = await readCache(this.cachePath(), source, this.settings.webDavUrl);
+                if (legacy.books.length) {
+                    // Bind the old unscoped array before any connection settings can change.
+                    await writeCache(this.cachePath(), legacy);
+                    await writeCache(this.cachePath(source), legacy);
+                    this.cache = legacy;
                 }
             }
+            this.status = this.cache.books.length ? this.cache.books.length + t(' 本书 · 本地缓存', ' books · Local cache') : t('尚无缓存书籍', 'No cached books yet');
+        } catch {
+            this.cache = { version: 1, source: '', checkedAt: '', books: [] };
+            this.status = t('缓存无法读取。可刷新重新获取；原缓存文件已保留。', 'Cannot read the cache. Refresh to fetch it again; the original file is preserved.');
         }
-
-        if (books.length === 0) {
-            new Notice("Failed to parse any books.");
+        this.notify();
+    }
+    async updateSettings(patch: Partial<MoonReaderSyncSettings>): Promise<void> {
+        const save = this.saves.then(async () => {
+            const next = { ...this.settings, ...patch };
+            await this.saveData(next);
+            this.settings = next;
+        });
+        this.saves = save.catch(() => {});
+        await save;
+    }
+    notify() { if (!this.disposed) this.listeners.forEach(fn => fn()); }
+    openLibrary(refreshIfEmpty = true) {
+        if (this.browser) {
+            this.browser.inputEl.focus();
+            if (refreshIfEmpty && !this.cache.books.length && this.configured()) void this.refresh();
             return;
         }
-
-        if (updatedCount > 0 || books.length !== cachedBooks.length) {
-            await this.saveCache(books);
-            new Notice(updatedCount > 0 ? `Synced successfully. ${updatedCount} books updated.` : `Synced successfully. Cache rebuilt.`);
-        } else {
-            new Notice("Everything is up to date. Loaded from cache.");
+        const active = this.app.workspace.getActiveViewOfType(MarkdownView);
+        const leaves = this.app.workspace.getLeavesOfType('markdown');
+        const recent = this.app.workspace.getMostRecentLeaf()?.view;
+        const history = this.app.workspace.getLastOpenFiles();
+        const view = active || (leaves.some(leaf => leaf.view === this.recentMarkdownView) ? this.recentMarkdownView : null) ||
+            (recent instanceof MarkdownView ? recent : null) ||
+            history.map(path => leaves.find(leaf => leaf.view instanceof MarkdownView && leaf.view.file?.path === path)?.view as MarkdownView | undefined).find(Boolean) ||
+            (leaves.length === 1 && leaves[0].view instanceof MarkdownView ? leaves[0].view : null);
+        this.browser = new BookSuggestModal(this.app, this, view, () => { this.browser = null; });
+        this.browser.open();
+        if (refreshIfEmpty && !this.cache.books.length && this.configured()) void this.refresh();
+    }
+    openConnectionSettings() {
+        if (this.connectionModal) return;
+        const modal = new Modal(this.app);
+        modal.modalEl.addClass('moonreader-connection');
+        this.connectionModal = modal;
+        modal.setTitle(t('连接静读天下备份', 'Connect MoonReader backup'));
+        const tab = new MoonReaderWebDAVSettingTab(this.app, this, () => { modal.close(); this.openLibrary(); }, true);
+        tab.containerEl = modal.contentEl;
+        modal.onClose = () => { tab.hide(); this.connectionModal = null; };
+        tab.display();
+        modal.open();
+    }
+    async refresh() {
+        if (this.syncing) return;
+        if (this.connectionSaving) {
+            this.status = t('正在保存连接，请稍后刷新。', 'Connection is being saved. Refresh when it finishes.');
+            this.notify();
+            return;
         }
-        
-        new BookSuggestModal(this.app, this, books).open();
-    }
-
-    private escapeHtml(text: string): string {
-        if (!text) return "";
-        return text
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
-
-    renderNotes(notes: MoonReaderNote[], template: string): string {
-        let result = "";
-        for (const note of notes) {
-            let rendered = template;
-            rendered = rendered.replace(/{bookName}/g, this.escapeHtml(note.bookName));
-            rendered = rendered.replace(/{chapter}/g, this.escapeHtml(note.chapter));
-            rendered = rendered.replace(/{highlightText}/g, this.escapeHtml(note.highlightText));
-            rendered = rendered.replace(/{note}/g, this.escapeHtml(note.note));
-            rendered = rendered.replace(/{color}/g, this.escapeHtml(note.colorHex));
-            rendered = rendered.replace(/{timestamp}/g, this.escapeHtml(note.timestamp));
-            rendered = rendered.replace(/{id}/g, this.escapeHtml(note.id));
-            result += rendered;
+        if (!this.configured()) {
+            this.status = t('连接配置未完成，无法刷新。请点击右上角设置完成并保存连接；已有缓存仍可浏览和导入。', 'Cannot refresh: connection setup is incomplete. Open settings at the top right and save your connection; cached books remain available.');
+            this.notify();
+            return;
         }
-        return result;
-    }
-
-    async getPreviewText(item: BookItem): Promise<string> {
-        const previewNotes = item.notes.slice(0, 3);
-        return this.renderNotes(previewNotes, this.settings.noteTemplate);
-    }
-
-    async importBookToCursor(item: BookItem, template: string) {
-        new Notice(`Importing ${item.bookName}...`);
-        const text = this.renderNotes(item.notes, template);
-        
-        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (activeView) {
-            const editor = activeView.editor;
-            editor.replaceSelection(text);
-            new Notice("Notes inserted successfully!");
-        } else {
-            new Notice("No active markdown view found. Please open a note first.");
+        this.syncing = true;
+        const settings = { ...this.settings };
+        this.status = t('正在读取远端目录…', 'Reading remote folder…');
+        this.notify();
+        try {
+            const source = this.currentSource();
+            const password = this.app.secretStorage.getSecret(settings.secretId);
+            if (!password) throw new UserError(t('已保存的密码不可用，请重新输入并保存。', 'Saved password unavailable; re-enter and save it.'));
+            const result = await syncBooks(new WebDAVClient(settings.webDavUrl, settings.username, password),
+                this.cache.source === source ? this.cache.books : [], (done, total) => {
+                    this.status = t('正在检查书籍', 'Checking books') + ': ' + done + ' / ' + total;
+                    this.notify();
+                }, () => this.disposed);
+            if (this.disposed || source !== this.currentSource()) return;
+            const next: BookCache = { version: 1, source, checkedAt: result.checkedAt, books: result.books };
+            await writeCache(this.cachePath(source), next);
+            this.cache = next;
+            this.status = t('刷新完成', 'Refresh complete') + ': ' + result.updated + t(' 本更新，', ' updated, ') +
+                result.unchanged + t(' 本未变化，', ' unchanged, ') + result.failed + t(' 本失败。', ' failed.');
+            if (!result.books.length && !result.failed) this.status += t('目录中没有 .an 文件。请检查备份位置。', 'No .an files in this folder. Check the backup location.');
+            if (result.failed) this.status += t('已有缓存已保留；可重试刷新。失败书籍：', 'Existing cache retained; refresh to retry. Failed books: ') + result.failures.join('、');
+        } catch (error) {
+            if (this.disposed) return;
+            this.status = errorMessage(error) + ' ' + t('已有缓存仍可浏览和导入。', 'Existing cached books remain available.');
+        } finally {
+            this.syncing = false;
+            this.notify();
         }
-    }
-
-    async importBookToFile(item: BookItem, template: string, file: TFile) {
-        new Notice(`Importing ${item.bookName} to ${file.basename}...`);
-        const textToInsert = this.renderNotes(item.notes, template);
-        
-        const content = await this.app.vault.read(file);
-        
-        let action = this.settings.insertAction;
-        
-        if (action === "overwrite") {
-            const frontmatterRegex = /^---\r?\n[\s\S]*?\r?\n---\r?\n/;
-            const match = content.match(frontmatterRegex);
-            const frontmatter = match ? match[0] : "";
-            
-            await this.app.vault.modify(file, frontmatter + textToInsert);
-        } else {
-            // Default or append
-            await this.app.vault.modify(file, content + (content.endsWith("\n") ? "" : "\n") + textToInsert);
-        }
-        
-        new Notice("Notes imported successfully!");
     }
 }

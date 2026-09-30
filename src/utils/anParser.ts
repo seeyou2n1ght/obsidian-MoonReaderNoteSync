@@ -15,7 +15,7 @@ export class AnParser {
         const str = this.inflateBuffer(buffer);
         const lines = str.split(/\r?\n/);
         
-        let headerIndex = 0;
+        let headerIndex = -1;
         for (let i = 0; i < Math.min(15, lines.length); i++) {
             if (lines[i].trim() === '#') {
                 headerIndex = i + 1;
@@ -23,14 +23,19 @@ export class AnParser {
             }
         }
 
+        if (headerIndex < 0) throw new Error('Missing annotation header');
+
         const notes: MoonReaderNote[] = [];
         let idx = headerIndex;
 
         while (idx + 16 < lines.length) {
-            const block = lines.slice(idx, idx + 17).map(l => l.trim());
+            const block = lines.slice(idx, idx + 17);
             
             try {
-                const annId = parseInt(block[0], 10);
+                if (![0, 4, 6, 7, 8, 9].every(i => /^-?\d+$/.test(block[i].trim()))) {
+                    throw new Error('Invalid numeric field');
+                }
+                const annId = Number(block[0]);
                 const bookName = block[1];
                 const chapter = parseInt(block[4], 10);
                 const offset = parseInt(block[6], 10);
@@ -38,7 +43,7 @@ export class AnParser {
                 const colorInt = parseInt(block[8], 10);
                 const tsMs = parseInt(block[9], 10);
                 
-                if (isNaN(annId) || isNaN(chapter) || isNaN(offset) || isNaN(length) || isNaN(colorInt) || isNaN(tsMs)) {
+                if (![annId, chapter, offset, length, colorInt, tsMs].every(Number.isSafeInteger)) {
                     throw new Error("Invalid numeric field");
                 }
 
@@ -62,22 +67,23 @@ export class AnParser {
                         id: annId.toString()
                     });
                 }
-            } catch (e) {
-                // Defensive block skipping: isolates corrupted blocks
+            } catch {
+                // Never silently publish a partial book over a complete cache.
+                throw new Error(`Invalid annotation record at line ${idx + 1}`);
             }
             
             idx += 17;
         }
         
+        if (lines.slice(idx).some(line => line.trim() !== '')) throw new Error('Truncated annotation record');
         return notes;
     }
 
     private static inflateBuffer(buffer: ArrayBuffer): string {
         try {
             return pako.inflate(new Uint8Array(buffer), { to: 'string' });
-        } catch (e) {
-            console.error("Failed to inflate .an file", e);
-            return "";
+        } catch {
+            throw new Error('Cannot decompress annotation file');
         }
     }
 

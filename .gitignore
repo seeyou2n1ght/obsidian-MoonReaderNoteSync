@@ -6,4 +6,8 @@ hot-reload
 .vscode/
 data.json
 moonreader_cache.json
+moonreader_cache.*.json
 *.log
+.testdata/
+dist/
+docs/design/*.png

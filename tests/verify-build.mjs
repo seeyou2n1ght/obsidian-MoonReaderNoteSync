@@ -1,0 +1,47 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { createRequire, isBuiltin } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const manifest = JSON.parse(await readFile('manifest.json', 'utf8'));
+const pkg = JSON.parse(await readFile('package.json', 'utf8'));
+const lock = JSON.parse(await readFile('package-lock.json', 'utf8'));
+const versions = JSON.parse(await readFile('versions.json', 'utf8'));
+assert.equal(pkg.version, manifest.version, 'Package and manifest versions must match');
+assert.equal(lock.version, manifest.version, 'Lockfile version must match manifest');
+assert.equal(lock.packages[''].version, manifest.version, 'Lockfile root version must match manifest');
+assert.match(manifest.version, /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/, 'Obsidian requires a numeric x.y.z version');
+assert.match(manifest.minAppVersion, /^\d+\.\d+\.\d+$/);
+assert.equal(manifest.author, pkg.author);
+assert.ok(manifest.name && !/obsidian|plugin/i.test(manifest.name));
+assert.ok(manifest.description.length <= 250 && manifest.description.endsWith('.'));
+assert.equal(manifest.description, pkg.description);
+assert.ok(!manifest.id.includes('obsidian'));
+if (process.argv.includes('--tag')) {
+    const tag = process.argv[process.argv.indexOf('--tag') + 1];
+    assert.equal(tag, manifest.version, 'Release tag must match manifest version exactly, without a v prefix');
+}
+assert.equal(versions[manifest.version], manifest.minAppVersion, 'Compatibility map must match manifest');
+assert.equal(manifest.isDesktopOnly, true, 'Node filesystem and crypto require desktop-only manifest');
+assert.match(manifest.id, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+assert.ok((await readFile('styles.css', 'utf8')).trim());
+assert.ok((await readFile('LICENSE', 'utf8')).trim());
+assert.ok((await readFile('README.md', 'utf8')).trim());
+assert.ok((await readFile('CHANGELOG.md', 'utf8')).split(/\r?\n/).includes('## ' + manifest.version), 'Release notes must match the version');
+const code = await readFile('main.js', 'utf8');
+const notices = (await readFile('THIRD-PARTY-NOTICES.txt', 'utf8')).trim();
+assert.ok(code.includes(notices), 'The bundle must include third-party license notices');
+assert.ok(!code.includes('sourceMappingURL='), 'Release bundle must not include a development source map');
+const module = { exports: {} };
+const host = { Plugin: class {}, Modal: class {}, SuggestModal: class {}, PluginSettingTab: class {}, Component: class {} };
+const imports = new Set();
+new Function('require', 'module', 'exports', code)(name => {
+    imports.add(name);
+    if (name === 'obsidian') return host;
+    assert.ok(isBuiltin(name), 'Unexpected runtime dependency in release bundle: ' + name);
+    return require(name);
+}, module, module.exports);
+assert.equal(typeof module.exports.default, 'function', 'Bundle must export an Obsidian plugin');
+assert.ok(new module.exports.default() instanceof host.Plugin);
+assert.ok(imports.has('obsidian'));
+console.log('Release bundle loaded with a host stub; assets and version metadata agree. Node ' + process.version);

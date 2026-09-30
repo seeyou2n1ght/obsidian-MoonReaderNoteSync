@@ -1,32 +1,19 @@
 import { App, SuggestModal, TFile } from 'obsidian';
-import MoonReaderSyncPlugin from '../main';
-import { BookItem } from './bookSuggestModal';
+import { t } from '../i18n';
 
 export class FileSuggestModal extends SuggestModal<TFile> {
-    plugin: MoonReaderSyncPlugin;
-    bookItem: BookItem;
-    template: string;
-
-    constructor(app: App, plugin: MoonReaderSyncPlugin, bookItem: BookItem, template: string) {
+    private chosen = false;
+    constructor(app: App, private select: (file: TFile) => void, private restoreFocus: () => void) {
         super(app);
-        this.plugin = plugin;
-        this.bookItem = bookItem;
-        this.template = template;
-        this.setPlaceholder("Select a note to insert into...");
+        this.setPlaceholder(t('搜索目标笔记…', 'Search target notes…'));
     }
-
     getSuggestions(query: string): TFile[] {
-        const files = this.app.vault.getMarkdownFiles();
-        const lowerQuery = query.toLowerCase();
-        return files.filter(f => f.path.toLowerCase().includes(lowerQuery));
+        return this.app.vault.getMarkdownFiles().filter(f => f.path.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
     }
-
     renderSuggestion(file: TFile, el: HTMLElement) {
-        el.createEl("div", { text: file.basename });
-        el.createEl("small", { text: file.path, cls: "nav-folder-title-content" });
+        el.createDiv({ text: file.basename });
+        el.createEl('small', { text: file.path, cls: 'moonreader-meta' });
     }
-
-    onChooseSuggestion(file: TFile, evt: MouseEvent | KeyboardEvent) {
-        this.plugin.importBookToFile(this.bookItem, this.template, file);
-    }
+    onChooseSuggestion(file: TFile) { this.chosen = true; this.select(file); this.restoreFocus(); }
+    onClose() { super.onClose(); if (!this.chosen) this.restoreFocus(); }
 }

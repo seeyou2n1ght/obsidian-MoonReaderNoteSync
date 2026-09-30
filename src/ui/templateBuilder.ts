@@ -1,134 +1,57 @@
-import { App, MarkdownRenderer, Component } from 'obsidian';
-import MoonReaderSyncPlugin from '../main';
-import { MoonReaderNote } from '../utils/anParser';
+import { Component, MarkdownRenderer, App } from 'obsidian';
+import type { MoonReaderNote } from '../utils/anParser';
+import { t } from '../i18n';
+
+// Each preview owns its render lifecycle. Superseded renders never replace newer content.
+export class NotePreview extends Component {
+    private renderOwner: Component | null = null;
+    private revision = 0;
+    constructor(private app: App, private el: HTMLElement) { super(); }
+    async render(text: string, sourcePath: string) {
+        const revision = ++this.revision;
+        if (this.renderOwner) this.removeChild(this.renderOwner);
+        const owner = this.addChild(new Component());
+        this.renderOwner = owner;
+        const staging = this.el.ownerDocument.createElement('div');
+        staging.addClass('markdown-rendered');
+        try {
+            await MarkdownRenderer.render(this.app, text, staging, sourcePath, owner);
+            if (revision === this.revision) this.el.replaceChildren(staging);
+        } catch {
+            if (revision === this.revision) this.el.setText(t('预览失败，请检查模板。', 'Preview failed. Check the template.'));
+        }
+    }
+    onunload() { this.revision++; }
+}
 
 export class TemplateBuilderUI {
-    static build(containerEl: HTMLElement, app: App, plugin: MoonReaderSyncPlugin, initialTemplate: string, onChange: (value: string) => void) {
-        const builderContainer = containerEl.createDiv({ cls: 'moonreader-template-builder' });
-        
-        // Ensure flex layout
-        builderContainer.style.display = 'flex';
-        builderContainer.style.gap = '20px';
-        builderContainer.style.marginTop = '10px';
-        builderContainer.style.alignItems = 'flex-start';
-
-        // Left Panel: Draggable Fields
-        const leftPanel = builderContainer.createDiv();
-        leftPanel.style.flex = '0 0 130px';
-        leftPanel.style.display = 'flex';
-        leftPanel.style.flexDirection = 'column';
-        leftPanel.style.gap = '6px';
-
-        leftPanel.createEl('h4', { text: 'Available Fields' });
-        leftPanel.createEl('small', { text: 'Drag or click', cls: 'setting-item-description' }).style.marginBottom = '4px';
-
-        const fields = [
-            { id: '{bookName}', name: 'Book Name', desc: 'Title of the book' },
-            { id: '{chapter}', name: 'Chapter', desc: 'Chapter name or index' },
-            { id: '{highlightText}', name: 'Highlight', desc: 'The highlighted text' },
-            { id: '{note}', name: 'Note', desc: 'Your personal note' },
-            { id: '{color}', name: 'Color (Hex)', desc: 'Highlight color in #RRGGBB' },
-            { id: '{timestamp}', name: 'Timestamp', desc: 'Time of highlight' },
-            { id: '{id}', name: 'ID', desc: 'Unique annotation ID' }
-        ];
-
-        let currentTemplate = initialTemplate;
-        
-        // Right Panel: Editor and Preview
-        const rightPanel = builderContainer.createDiv();
-        rightPanel.style.flex = '1 1 auto';
-        rightPanel.style.display = 'flex';
-        rightPanel.style.flexDirection = 'column';
-        rightPanel.style.gap = '15px';
-
-        const editorTitle = rightPanel.createEl('h4', { text: 'Template Editor' });
-        
-        const textArea = rightPanel.createEl('textarea', { cls: 'moonreader-template-textarea' });
-        textArea.style.width = '100%';
-        textArea.style.minHeight = '150px';
-        textArea.style.fontFamily = 'monospace';
-        textArea.style.resize = 'vertical';
-        textArea.style.padding = '8px';
-        textArea.value = currentTemplate;
-
-        // Preview Area
-        rightPanel.createEl('h4', { text: 'Live Preview' });
-        const previewEl = rightPanel.createDiv({ cls: 'moonreader-template-preview markdown-rendered' });
-        previewEl.style.border = '1px solid var(--background-modifier-border)';
-        previewEl.style.padding = '15px';
-        previewEl.style.borderRadius = '4px';
-        previewEl.style.minHeight = '100px';
-        previewEl.style.backgroundColor = 'var(--background-primary)';
-
-        const dummyNote: MoonReaderNote = {
-            id: '12345678',
-            bookName: 'Obsidian Plugins Guide',
-            chapter: 'Chapter 4: Advanced WebDAV',
-            highlightText: 'This is a sample highlighted text from the book.',
-            note: 'This is my personal thought on this highlight.',
-            colorHex: '#FFEB3B',
-            timestamp: '2026-05-21 12:00:00'
+    static build(container: HTMLElement, initial: string, onChange: (value: string) => void) {
+        const editor = container.createEl('textarea', { cls: 'moonreader-template-textarea', attr: { 'aria-label': t('笔记模板', 'Note template'), spellcheck: 'false' } });
+        editor.value = initial;
+        container.createDiv({ cls: 'moonreader-meta moonreader-field-hint', text: t('可用字段 · 点击插入到光标处', 'Available fields · Click to insert at the cursor') });
+        const fields = container.createDiv({ cls: 'moonreader-fields' });
+        const insert = (value: string) => {
+            editor.setRangeText(value, editor.selectionStart, editor.selectionEnd, 'end');
+            editor.focus();
+            onChange(editor.value);
         };
-
-        const updatePreview = () => {
-            currentTemplate = textArea.value;
-            onChange(currentTemplate);
-            
-            const renderedText = plugin.renderNotes([dummyNote], currentTemplate);
-            previewEl.empty();
-            
-            // We use MarkdownRenderer to provide a real Obsidian preview
-            // A dummy component is needed for the renderer
-            const component = new Component();
-            MarkdownRenderer.renderMarkdown(renderedText, previewEl, '', component);
-        };
-
-        textArea.addEventListener('input', updatePreview);
-
-        // Populate fields
-        fields.forEach(f => {
-            const fieldEl = leftPanel.createDiv({ cls: 'moonreader-field-pill' });
-            fieldEl.style.padding = '4px 8px';
-            fieldEl.style.backgroundColor = 'var(--background-secondary)';
-            fieldEl.style.border = '1px solid var(--background-modifier-border)';
-            fieldEl.style.borderRadius = '4px';
-            fieldEl.style.cursor = 'grab';
-            fieldEl.style.userSelect = 'none';
-            fieldEl.style.textAlign = 'center';
-            fieldEl.style.color = 'var(--text-muted)';
-            fieldEl.title = f.name + ": " + f.desc; // 鼠标悬浮时显示提示
-            
-            fieldEl.createEl('strong', { text: f.id }).style.fontSize = '0.9em';
-
-            // Make draggable
-            fieldEl.draggable = true;
-            
-            fieldEl.addEventListener('dragstart', (e) => {
-                if (e.dataTransfer) {
-                    e.dataTransfer.setData('text/plain', f.id);
-                    e.dataTransfer.effectAllowed = 'copy';
-                }
-            });
-
-            // Click to insert at cursor
-            fieldEl.addEventListener('click', () => {
-                const startPos = textArea.selectionStart;
-                const endPos = textArea.selectionEnd;
-                
-                const textBefore = textArea.value.substring(0, startPos);
-                const textAfter = textArea.value.substring(endPos, textArea.value.length);
-                
-                textArea.value = textBefore + f.id + textAfter;
-                
-                // Move cursor after inserted text
-                textArea.selectionStart = textArea.selectionEnd = startPos + f.id.length;
-                textArea.focus();
-                
-                updatePreview();
-            });
-        });
-
-        // Initial preview render
-        updatePreview();
+        for (const [field, label] of [
+            ['bookName', t('书名', 'Book')], ['chapter', t('章节索引', 'Chapter index')],
+            ['highlightText', t('高亮原文', 'Highlight')], ['note', t('批注', 'Note')],
+            ['color', t('高亮颜色', 'Color')], ['timestamp', t('UTC 时间', 'UTC time')], ['id', t('笔记编号', 'Note ID')]
+        ]) {
+            const value = '{' + field + '}';
+            const button = fields.createEl('button', { attr: { type: 'button', title: label + ' · ' + t('点击或拖入模板', 'Click or drag into the template'), 'aria-label': label + ' ' + value } });
+            button.createEl('code', { text: value });
+            button.createEl('span', { text: label });
+            button.draggable = true;
+            button.addEventListener('click', () => insert(value));
+            button.addEventListener('dragstart', event => event.dataTransfer?.setData('text/plain', value));
+        }
+        editor.addEventListener('input', () => onChange(editor.value));
+        return editor;
+    }
+    static sample(): MoonReaderNote[] {
+        return [{ id: '12345678', bookName: t('阅读示例', 'Reading example'), chapter: '4', highlightText: t('这是书中的一段高亮。', 'A highlighted passage from a book.'), note: t('这是我的阅读批注。', 'My reading note.'), colorHex: '#FFEB3B', timestamp: '2026-01-01 12:00:00' }];
     }
 }
