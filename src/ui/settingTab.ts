@@ -81,6 +81,16 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
         }
         new Setting(el).setName(t('阅读笔记', 'Reading notes')).setDesc(t('浏览缓存书籍并插入当前笔记。', 'Browse cached books and insert into the current note.'))
             .addButton(button => button.setButtonText(t('浏览书籍', 'Browse books')).onClick(() => this.browse()));
+        new Setting(el).setName(t('显示书籍数量', 'Books shown')).setDesc(t('0 表示全部。先搜索和排序，再限制显示数量；不影响备份下载。', '0 shows all books. Search and sort are applied before this limit; downloads are unaffected.'))
+            .addText(text => {
+                text.inputEl.type = 'number'; text.inputEl.min = '0'; text.inputEl.step = '1';
+                text.setValue(String(this.plugin.settings.bookListLimit)).onChange(async value => {
+                    const limit = /^\d+$/.test(value) ? Number(value) : NaN;
+                    if (!Number.isSafeInteger(limit)) { status.setText(t('请输入非负整数，0 表示全部书籍。', 'Enter a non-negative integer. Use 0 for all books.')); return; }
+                    try { await this.plugin.updateSettings({ bookListLimit: limit }); this.plugin.notify(); status.setText(t('书库显示设置已保存。', 'Library display settings saved.')); }
+                    catch (error) { status.setText(errorMessage(error)); text.setValue(String(this.plugin.settings.bookListLimit)); }
+                });
+            });
         el.createEl('h3', { text: t('导入偏好', 'Import preferences') });
         new Setting(el).setName(t('默认写入方式', 'Default import mode')).setDesc(t('每次导入都会展示目标。替换正文始终需要确认。', 'Every import shows its destination. Replacing the body always requires confirmation.'))
             .addDropdown(dropdown => dropdown.addOption('ask', t('当前笔记光标处', 'Current note cursor')).addOption('append', t('文末追加', 'Append')).setValue(this.plugin.settings.insertAction === 'overwrite' ? 'ask' : this.plugin.settings.insertAction).onChange(async value => {

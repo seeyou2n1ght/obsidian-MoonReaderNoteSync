@@ -104,7 +104,9 @@ export class ImportPanel extends Component {
         this.warning.setText([this.book?.syncError || '', repeat ? t('本次会话已向此笔记导入过这本书。再次导入可能产生重复内容。', 'This book was already imported into this note during this session. Importing again may duplicate content.') : ''].filter(Boolean).join(' '));
     }
     private updateDestination() {
-        this.targetLabel.setText(this.target ? t('写入 ', 'Write to ') + this.target.path : t('尚未选择目标笔记', 'No target note selected'));
+        this.targetLabel.setText(this.target ? this.target.path.split('/').pop()! : t('尚未选择目标笔记', 'No target note selected'));
+        this.targetLabel.title = this.target?.path || '';
+        this.targetLabel.setAttribute('aria-label', this.target ? t('写入 ', 'Write to ') + this.target.path : t('尚未选择目标笔记', 'No target note selected'));
         this.modeLabel.setText(!this.target ? t('没有可用的已打开笔记，选择后追加到文末', 'No open note is available; choose one to append to its end') : this.action === 'cursor' ? t('打开面板时记录的笔记光标处', 'Cursor captured when the panel opened') : this.action === 'append' ? t('文末追加', 'Append to end') : t('替换正文 · 保留 YAML 属性', 'Replace body · Preserve YAML properties'));
     }
     private updateButton() {

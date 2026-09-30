@@ -1,14 +1,18 @@
-import { App, ButtonComponent, Component, MarkdownView, Modal } from 'obsidian';
+import { App, ButtonComponent, Component, MarkdownView, Menu, Modal } from 'obsidian';
 import type MoonReaderSyncPlugin from '../main';
 import type { BookItem } from '../utils/notes';
 import { ImportPanel } from './importPanel';
-import { t } from '../i18n';
+import { t, errorMessage } from '../i18n';
 
 export class BookSuggestModal extends Modal {
     inputEl!: HTMLInputElement;
     private owner = new Component();
     private panel!: ImportPanel;
     private list!: HTMLElement;
+    private listCount!: HTMLElement;
+    private bookOrder!: ButtonComponent;
+    private orderMenu: Menu | null = null;
+    private savingOrder = false;
     private reading!: HTMLElement;
     private empty!: HTMLElement;
     private status!: HTMLElement;
@@ -35,6 +39,10 @@ export class BookSuggestModal extends Modal {
         const workspace = this.contentEl.createDiv({ cls: 'moonreader-workspace' });
         const sidebar = workspace.createDiv({ cls: 'moonreader-sidebar' });
         this.inputEl = sidebar.createEl('input', { attr: { type: 'search', placeholder: t('搜索书籍…', 'Search books…'), 'aria-label': t('搜索书籍', 'Search books') } });
+        const order = sidebar.createDiv({ cls: 'moonreader-list-order' });
+        this.listCount = order.createDiv({ cls: 'moonreader-meta', attr: { role: 'status', 'aria-live': 'polite' } });
+        this.bookOrder = new ButtonComponent(order).setTooltip(t('书籍排序', 'Book order')).onClick(() => this.openOrderMenu());
+        this.bookOrder.buttonEl.setAttribute('aria-haspopup', 'menu');
         this.list = sidebar.createDiv({ cls: 'moonreader-book-list', attr: { role: 'listbox', 'aria-label': t('书籍', 'Books') } });
         const right = workspace.createDiv({ cls: 'moonreader-reading' });
         this.reading = right.createDiv();
@@ -59,20 +67,67 @@ export class BookSuggestModal extends Modal {
             }
         }, true);
         let books = this.plugin.cache.books;
+        let limit = this.plugin.settings.bookListLimit;
+        let sort = this.plugin.settings.bookListSort;
+        let direction = this.plugin.settings.bookListDirection;
         const update = () => {
             this.status.setText(this.plugin.status);
             this.connectionStatus.setText(this.plugin.connectionStatus());
+            this.connectionStatus.hidden = this.plugin.configured();
+            this.updateOrderButton();
             this.refreshButton.setDisabled(this.plugin.syncing || this.panel.busy);
-            if (books !== this.plugin.cache.books && !this.panel.busy) { books = this.plugin.cache.books; this.renderBooks(); }
+            if (!this.panel.busy && (books !== this.plugin.cache.books || limit !== this.plugin.settings.bookListLimit || sort !== this.plugin.settings.bookListSort || direction !== this.plugin.settings.bookListDirection)) {
+                books = this.plugin.cache.books; limit = this.plugin.settings.bookListLimit; sort = this.plugin.settings.bookListSort; direction = this.plugin.settings.bookListDirection; this.renderBooks();
+            }
         };
         this.plugin.listeners.add(update);
         this.unsubscribe = () => this.plugin.listeners.delete(update);
         this.renderBooks(); update(); this.inputEl.focus();
     }
+    private updateOrderButton() {
+        this.bookOrder.setButtonText((this.plugin.settings.bookListSort === 'title' ? t('书名', 'Title') : t('修改时间', 'Modified')) + (this.plugin.settings.bookListDirection === 'asc' ? ' ↑' : ' ↓'));
+        this.bookOrder.buttonEl.title = t('更改排序。日期为 WebDAV 备份文件的修改时间，不是阅读或批注时间。', 'Change book order. Date means the WebDAV backup file’s modification time, not reading or annotation time.');
+        this.bookOrder.setDisabled(this.panel.busy || this.savingOrder);
+    }
+    private async saveOrder(sort: 'backup-date' | 'title', direction: 'asc' | 'desc') {
+        if (this.disposed || this.panel.busy || this.savingOrder) return;
+        this.savingOrder = true; this.updateOrderButton();
+        try { await this.plugin.updateSettings({ bookListSort: sort, bookListDirection: direction }); this.plugin.notify(); }
+        catch (error) { if (!this.disposed) this.status.setText(errorMessage(error)); }
+        finally { this.savingOrder = false; if (!this.disposed) this.updateOrderButton(); }
+    }
+    private openOrderMenu() {
+        if (this.disposed || this.panel.busy || this.savingOrder) return;
+        this.orderMenu?.hide();
+        const menu = this.orderMenu = new Menu();
+        for (const [sort, label] of [['backup-date', t('修改时间', 'Modification time')], ['title', t('书名', 'Title')]] as const) {
+            menu.addItem(item => item.setTitle(label).setChecked(this.plugin.settings.bookListSort === sort).onClick(() => {
+                if (this.plugin.settings.bookListSort !== sort) void this.saveOrder(sort, sort === 'title' ? 'asc' : 'desc');
+            }));
+        }
+        menu.addSeparator();
+        for (const [direction, label] of [['asc', t('升序', 'Ascending')], ['desc', t('降序', 'Descending')]] as const) {
+            menu.addItem(item => item.setTitle(label).setChecked(this.plugin.settings.bookListDirection === direction).onClick(() => { void this.saveOrder(this.plugin.settings.bookListSort, direction); }));
+        }
+        const rect = this.bookOrder.buttonEl.getBoundingClientRect(); menu.showAtPosition({ x: rect.left, y: rect.bottom });
+    }
     private renderBooks() {
         if (this.panel.busy || this.disposed) return;
         const query = this.inputEl.value.trim().toLocaleLowerCase();
-        this.shownBooks = this.plugin.cache.books.filter(book => book.bookName.toLocaleLowerCase().includes(query));
+        const matched = this.plugin.cache.books.filter(book => book.bookName.toLocaleLowerCase().includes(query));
+        const titles = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+        const titleOrder = (a: BookItem, b: BookItem) => titles.compare(a.bookName, b.bookName) || a.fileHref.localeCompare(b.fileHref);
+        const modified = (book: BookItem) => { const date = Date.parse(book.lastModified || ''); return Number.isFinite(date) ? date : -Infinity; };
+        matched.sort((a, b) => {
+            if (this.plugin.settings.bookListSort === 'title') return titleOrder(a, b) * (this.plugin.settings.bookListDirection === 'asc' ? 1 : -1);
+            const first = modified(a), second = modified(b);
+            if (first === second) return titleOrder(a, b);
+            if (first === -Infinity) return 1;
+            if (second === -Infinity) return -1;
+            return (first > second ? 1 : -1) * (this.plugin.settings.bookListDirection === 'asc' ? 1 : -1);
+        });
+        this.shownBooks = this.plugin.settings.bookListLimit > 0 ? matched.slice(0, this.plugin.settings.bookListLimit) : matched;
+        this.listCount.setText(t('书籍 ', 'Books ') + this.shownBooks.length + '/' + matched.length);
         const book = this.shownBooks.find(book => book.fileHref === this.selected) || this.shownBooks[0] || null;
         this.selected = book?.fileHref || null;
         const restoreListFocus = this.list.contains(this.list.ownerDocument.activeElement);
@@ -112,10 +167,12 @@ export class BookSuggestModal extends Modal {
     }
     private updateBusy() {
         this.inputEl.disabled = this.panel.busy;
+        this.bookOrder.setDisabled(this.panel.busy || this.savingOrder);
+        if (this.panel.busy) this.orderMenu?.hide();
         this.list.querySelectorAll<HTMLButtonElement>('button').forEach(el => el.disabled = this.panel.busy);
         this.refreshButton.setDisabled(this.panel.busy || this.plugin.syncing);
         this.settingsButton.setDisabled(this.panel.busy);
     }
     close() { if (this.panel?.busy) { this.closeRequested = true; return; } super.close(); }
-    onClose() { this.disposed = true; this.unsubscribe(); this.owner.unload(); this.contentEl.empty(); this.closed(); }
+    onClose() { this.disposed = true; this.orderMenu?.hide(); this.unsubscribe(); this.owner.unload(); this.contentEl.empty(); this.closed(); }
 }

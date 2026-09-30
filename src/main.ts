@@ -33,6 +33,9 @@ export default class MoonReaderSyncPlugin extends Plugin {
             webDavUrl: saved.webDavUrl ?? DEFAULT_SETTINGS.webDavUrl,
             username: saved.username ?? DEFAULT_SETTINGS.username,
             secretId: saved.secretId ?? '',
+            bookListLimit: Number.isSafeInteger(saved.bookListLimit) && saved.bookListLimit >= 0 ? saved.bookListLimit : DEFAULT_SETTINGS.bookListLimit,
+            bookListSort: saved.bookListSort === 'title' ? 'title' : DEFAULT_SETTINGS.bookListSort,
+            bookListDirection: saved.bookListDirection === 'asc' || saved.bookListDirection === 'desc' ? saved.bookListDirection : saved.bookListSort === 'title' ? 'asc' : DEFAULT_SETTINGS.bookListDirection,
             insertAction: saved.insertAction ?? DEFAULT_SETTINGS.insertAction,
             noteTemplate: saved.noteTemplate ?? DEFAULT_SETTINGS.noteTemplate
         };

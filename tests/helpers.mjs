@@ -104,3 +104,8 @@ export function chooseMode(h, modal, mode) {
     button(modal.modalEl, 'More').click();
     button(h.document.querySelector('[role=menu]'), { cursor: 'Insert at cursor', append: 'Append to end', overwrite: 'Replace body…' }[mode]).click();
 }
+export function chooseSort(h, modal, label) {
+    const control = modal.contentEl.querySelector('button[aria-label="Book order"]');
+    assert.ok(control); control.click();
+    button(h.document.querySelector('[role=menu]'), label).click();
+}

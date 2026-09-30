@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { deflateSync } from 'node:zlib';
-import { harness, button, input, change, until, deferred, openImport, chooseMode, book } from './helpers.mjs';
+import { harness, button, input, change, until, deferred, openImport, chooseMode, chooseSort, book } from './helpers.mjs';
 
 const packed = deflateSync(['1', 'header', 'version', '#', '100', 'Synthetic book', 'path', 'path', '1', '0', '0', '9', '-65536', '1767225600000', '', 'Thought', 'Highlight', '0', '0', '0', ''].join('\n'));
 function entry(href = 'book%23one.an', prop = '') {
@@ -154,7 +154,7 @@ test('settings disk failure leaves effective settings unchanged and allows retry
     const tab = settings(h), before = JSON.stringify(h.plugin.settings);
     change(h, input(tab.containerEl, 'WebDAV folder URL'), dav.url + 'new/');
     h.state.beforeSave = async () => { throw new Error('Controlled settings failure'); };
-    const preference = tab.containerEl.querySelector('select');
+    const preference = tab.containerEl.querySelector('select[aria-label^="Default import mode"]');
     assert.equal(preference.value, 'ask');
     change(h, preference, 'append', 'change');
     await until(() => preference.value === 'ask');
@@ -294,7 +294,7 @@ test('selection and search update the preview in the same dialog and no matches 
     first.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
     assert.equal(h.document.activeElement.getAttribute('aria-selected'), 'true');
     assert.match(h.document.activeElement.textContent, /Second book/);
-    modal.contentEl.querySelectorAll('[role=option]')[1].click();
+    modal.contentEl.querySelector('[role=option][title="Second book"]').click();
     await until(() => modal.contentEl.querySelector('.moonreader-preview').textContent.includes('Second highlight'));
     assert.equal(h.document.querySelectorAll('[role=dialog]').length, 1);
     assert.equal(h.state.writes, 0);
@@ -330,7 +330,7 @@ test('keyboard cannot bypass overwrite confirmation; choosing another book cance
     assert.equal(h.state.writes, 0);
     h.plugin.cache.books = [book, { ...book, fileHref: 'https://fixture.test/other.an', bookName: 'Second book' }];
     h.plugin.notify();
-    modal.contentEl.querySelectorAll('[role=option]')[1].click();
+    modal.contentEl.querySelector('[role=option][title="Second book"]').click();
     assert.equal(modal.contentEl.querySelector('.moonreader-confirmation').hidden, true);
     assert.equal(button(modal.modalEl, 'Append 1 notes').disabled, false);
 });
@@ -342,6 +342,7 @@ test('close waits for the pending write and prevents repeated submission and sel
     modal.close();
     assert.equal(modal.modalEl.isConnected, true);
     assert.equal(modal.inputEl.disabled, true);
+    assert.equal(modal.contentEl.querySelector('button[aria-label="Book order"]').disabled, true);
     assert.equal(modal.contentEl.querySelector('[role=option]').disabled, true);
     gate.resolve();
     await until(() => !modal.modalEl.isConnected);
@@ -468,6 +469,136 @@ test('returning to an already open empty library fetches once without creating a
     assert.equal(h.document.querySelectorAll('.moonreader-library').length, 1);
     h.plugin.cache.books = [book]; h.plugin.openLibrary();
     assert.equal(refreshes, 1);
+});
+
+test('library sorts backups before limiting, searches all cached books and never changes cache order', async t => {
+    const h = await harness(t);
+    const books = [
+        { ...book, fileHref: 'https://fixture.test/a.an', bookName: 'Book 10', lastModified: '2026-01-01T00:00:00Z' },
+        { ...book, fileHref: 'https://fixture.test/b.an', bookName: 'Book 2', lastModified: '2026-03-01T00:00:00Z' },
+        { ...book, fileHref: 'https://fixture.test/c.an', bookName: 'Alpha', lastModified: 'invalid' },
+        { ...book, fileHref: 'https://fixture.test/d.an', bookName: 'beta' }
+    ];
+    const originalOrder = books.map(item => item.fileHref);
+    h.plugin.cache.books = books;
+    const modal = new h.BookSuggestModal(h.app, h.plugin, h.view, () => {}); modal.open();
+    const titles = () => [...modal.contentEl.querySelectorAll('[role=option] > span:first-child')].map(el => el.textContent);
+    assert.deepEqual(titles(), ['Book 2', 'Book 10', 'Alpha', 'beta']);
+    await h.plugin.updateSettings({ bookListLimit: 1 }); h.plugin.notify();
+    assert.deepEqual(titles(), ['Book 2']);
+    assert.match(modal.contentEl.textContent, /Books 1\/4/);
+    change(h, modal.inputEl, 'Alpha');
+    assert.deepEqual(titles(), ['Alpha']);
+    change(h, modal.inputEl, 'absent');
+    assert.deepEqual(titles(), []); assert.equal(button(modal.modalEl, 'Insert 0 notes').disabled, true);
+    change(h, modal.inputEl, '');
+    await h.plugin.updateSettings({ bookListSort: 'title', bookListDirection: 'asc', bookListLimit: 0 }); h.plugin.notify();
+    assert.deepEqual(titles(), ['Alpha', 'beta', 'Book 2', 'Book 10']);
+    assert.deepEqual(h.plugin.cache.books, books);
+    assert.deepEqual(h.plugin.cache.books.map(item => item.fileHref), originalOrder);
+    assert.equal(h.plugin.cache.books[0].bookName, 'Book 10');
+    books[0].lastModified = books[1].lastModified;
+    await h.plugin.updateSettings({ bookListSort: 'backup-date', bookListDirection: 'desc' }); h.plugin.notify();
+    assert.deepEqual(titles(), ['Book 2', 'Book 10', 'Alpha', 'beta']);
+    assert.equal(h.state.writes, 0);
+    modal.close();
+});
+
+test('display limits do not reduce WebDAV downloads or cached books', async t => {
+    const h = await harness(t), dav = await server(t);
+    dav.state.body = xml(entry('one.an') + entry('two.an') + entry('three.an'));
+    await connected(h, dav);
+    await h.plugin.updateSettings({ bookListLimit: 1 });
+    await h.plugin.refresh();
+    assert.equal(dav.state.requests.filter(request => request.method === 'GET').length, 3);
+    assert.equal(h.plugin.cache.books.length, 3);
+    const modal = new h.BookSuggestModal(h.app, h.plugin, h.view, () => {}); modal.open();
+    assert.equal(modal.contentEl.querySelectorAll('[role=option]').length, 1);
+    assert.match(modal.contentEl.textContent, /Books 1\/3/);
+    modal.close();
+});
+
+test('sort menu preserves search and selection, saves both directions and keeps unknown dates last', async t => {
+    const h = await harness(t);
+    h.plugin.cache.books = [
+        { ...book, bookName: 'Book A', fileHref: 'https://fixture.test/a.an', lastModified: '2026-01-01T00:00:00Z' },
+        { ...book, bookName: 'Book Z', fileHref: 'https://fixture.test/z.an', lastModified: '2026-02-01T00:00:00Z' },
+        { ...book, bookName: 'Book M', fileHref: 'https://fixture.test/m.an' },
+        { ...book, bookName: 'Book X', fileHref: 'https://fixture.test/x.an', lastModified: 'invalid' }
+    ];
+    let modal = new h.BookSuggestModal(h.app, h.plugin, h.view, () => {}); modal.open();
+    const titles = () => [...modal.contentEl.querySelectorAll('[role=option]')].map(row => row.title);
+    change(h, modal.inputEl, 'Book');
+    chooseSort(h, modal, 'Title'); await until(() => h.plugin.settings.bookListSort === 'title');
+    assert.deepEqual(titles(), ['Book A', 'Book M', 'Book X', 'Book Z']);
+    assert.equal(modal.inputEl.value, 'Book'); assert.equal(modal.contentEl.querySelector('[aria-selected=true]').title, 'Book Z');
+    chooseSort(h, modal, 'Descending'); await until(() => h.plugin.settings.bookListDirection === 'desc');
+    assert.deepEqual(titles(), ['Book Z', 'Book X', 'Book M', 'Book A']);
+    chooseSort(h, modal, 'Modification time'); await until(() => h.plugin.settings.bookListSort === 'backup-date');
+    assert.deepEqual(titles(), ['Book Z', 'Book A', 'Book M', 'Book X']);
+    chooseSort(h, modal, 'Ascending'); await until(() => h.plugin.settings.bookListDirection === 'asc');
+    assert.deepEqual(titles(), ['Book A', 'Book Z', 'Book M', 'Book X']);
+    await h.plugin.updateSettings({ bookListLimit: 1 }); h.plugin.notify();
+    assert.equal(modal.contentEl.querySelector('[aria-selected=true]').title, 'Book A');
+    assert.equal(modal.contentEl.querySelector('.moonreader-book-title').textContent, 'Book A');
+    modal.close(); modal = new h.BookSuggestModal(h.app, h.plugin, h.view, () => {}); modal.open();
+    assert.equal(modal.contentEl.querySelector('button[aria-label="Book order"]').textContent, 'Modified ↑');
+    const saved = JSON.parse(await fs.readFile(join(h.vault, h.dir, 'data.json'), 'utf8'));
+    assert.equal(saved.bookListDirection, 'asc'); assert.equal(saved.bookListSort, 'backup-date');
+    assert.equal(h.state.writes, 0); modal.close();
+});
+
+test('library hides healthy connection status and shortens the target without hiding replacement details', async t => {
+    const h = await harness(t);
+    h.target.path = 'Folder/Target.md';
+    const modal = openImport(h);
+    const destination = modal.contentEl.querySelector('.moonreader-destination > div');
+    assert.equal(destination.textContent, 'Target.md'); assert.equal(destination.title, h.target.path);
+    assert.ok(destination.getAttribute('aria-label').includes(h.target.path));
+    assert.equal(modal.contentEl.querySelector('.moonreader-connection-status').hidden, false);
+    h.secrets.set('synthetic', 'synthetic-password');
+    await h.plugin.updateSettings({ username: 'reader', secretId: 'synthetic' }); h.plugin.notify();
+    assert.equal(modal.contentEl.querySelector('.moonreader-connection-status').hidden, true);
+    chooseMode(h, modal, 'overwrite');
+    assert.ok(modal.contentEl.querySelector('.moonreader-confirmation').textContent.includes(h.target.path));
+    assert.equal(h.state.writes, 0); modal.close();
+});
+
+test('list preferences persist, reject invalid limits and recover from a failed save', async t => {
+    const h = await harness(t), tab = settings(h);
+    const limit = input(tab.containerEl, 'Books shown');
+    assert.equal(limit.value, '0');
+    change(h, limit, '2'); await until(() => h.plugin.settings.bookListLimit === 2);
+    const modal = openImport(h);
+    const order = modal.contentEl.querySelector('button[aria-label="Book order"]');
+    assert.ok(modal.contentEl.querySelector('.moonreader-sidebar').contains(order));
+    assert.ok(order.compareDocumentPosition(modal.contentEl.querySelector('[role=listbox]')) & h.dom.window.Node.DOCUMENT_POSITION_FOLLOWING);
+    assert.ok(!tab.containerEl.querySelector('select[aria-label="Book order"]'));
+    chooseSort(h, modal, 'Title'); await until(() => !order.disabled);
+    const saved = JSON.parse(await fs.readFile(join(h.vault, h.dir, 'data.json'), 'utf8'));
+    assert.equal(saved.bookListLimit, 2); assert.equal(saved.bookListSort, 'title');
+    const saves = h.state.saves;
+    for (const invalid of ['-1', '1.5', '', '9007199254740992']) change(h, limit, invalid);
+    assert.equal(h.state.saves, saves); assert.equal(h.plugin.settings.bookListLimit, 2);
+    h.state.beforeSave = async () => { throw new Error('Controlled preference save failure'); };
+    chooseSort(h, modal, 'Modification time'); await until(() => !order.disabled);
+    assert.equal(order.textContent, 'Title ↑'); assert.equal(h.plugin.settings.bookListSort, 'title');
+    change(h, limit, '3'); await until(() => limit.value === '2');
+    assert.equal(h.plugin.settings.bookListLimit, 2);
+    h.state.beforeSave = null;
+    change(h, limit, '0'); await until(() => h.plugin.settings.bookListLimit === 0);
+    tab.hide();
+    modal.close();
+});
+
+test('list defaults survive old configurations and invalid persisted preferences', async t => {
+    const h = await harness(t);
+    for (const data of [{}, { bookListLimit: -1, bookListSort: 'unknown' }, { bookListLimit: 1.5 }, { bookListLimit: '20' }]) {
+        h.plugin.loadData = async () => data; await h.plugin.onload();
+        assert.equal(h.plugin.settings.bookListLimit, 0); assert.equal(h.plugin.settings.bookListSort, 'backup-date');
+    }
+    h.plugin.loadData = async () => ({ bookListLimit: 20, bookListSort: 'title' }); await h.plugin.onload();
+    assert.equal(h.plugin.settings.bookListLimit, 20); assert.equal(h.plugin.settings.bookListSort, 'title');
 });
 
 test('old credential fields are excluded on load and preferences survive without secret migration', async t => {
