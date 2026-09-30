@@ -16,7 +16,7 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
         const { containerEl: el } = this;
         el.empty();
         el.addClass('moonreader-settings');
-        el.createEl('h3', { text: t('连接备份', 'Backup connection') });
+        new Setting(el).setName(t('连接备份', 'Backup connection')).setHeading();
         el.createEl('p', { cls: 'moonreader-meta', text: t('连接包含 .an 文件的 WebDAV 目录，书籍缓存后可离线导入。', 'Connect the WebDAV folder containing .an files. Cached books can be imported offline.') });
         let url = this.plugin.settings.webDavUrl;
         let username = this.plugin.settings.username;
@@ -91,7 +91,7 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
                     catch (error) { status.setText(errorMessage(error)); text.setValue(String(this.plugin.settings.bookListLimit)); }
                 });
             });
-        el.createEl('h3', { text: t('导入偏好', 'Import preferences') });
+        new Setting(el).setName(t('导入偏好', 'Import preferences')).setHeading();
         new Setting(el).setName(t('默认写入方式', 'Default import mode')).setDesc(t('每次导入都会展示目标。替换正文始终需要确认。', 'Every import shows its destination. Replacing the body always requires confirmation.'))
             .addDropdown(dropdown => dropdown.addOption('ask', t('当前笔记光标处', 'Current note cursor')).addOption('append', t('文末追加', 'Append')).setValue(this.plugin.settings.insertAction === 'overwrite' ? 'ask' : this.plugin.settings.insertAction).onChange(async value => {
                 if (value !== 'ask' && value !== 'append') return;

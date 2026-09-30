@@ -36,7 +36,7 @@ export async function harness(t) {
     } };
     const api = evaluate(source.outputFiles[0].text, dom.window, host);
     const vault = join(root, 'vault');
-    const dir = '.obsidian/plugins/moonreader-note-sync';
+    const dir = '.obsidian/plugins/obsidian-moonreader-sync';
     await fs.mkdir(join(vault, dir), { recursive: true });
     const target = { path: 'Target.md', basename: 'Target' };
     const other = { path: 'Other.md', basename: 'Other' };

@@ -1,16 +1,26 @@
 # MoonReader Note Sync
 
+Import Moon+ Reader highlights and annotations from WebDAV backups into Obsidian. Browse books, preview annotations, and import them into an open note. Requires Obsidian 1.11.5+ on desktop.
+
+## Installation
+
+Download `main.js`, `manifest.json`, and `styles.css` from [GitHub Releases](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases). Place them in `.obsidian/plugins/obsidian-moonreader-sync/` in your vault and enable MoonReader Note Sync in Community plugins.
+
+## Usage
+
+Set the WebDAV backup folder, username, and password in plugin settings. Use **Test connection**, then **Save connection**. Open the library from the ribbon, select a book, check the preview and destination, then import. [Full English instructions](README.en.md) follow the same workflow as the Chinese guide below.
+
 [English](README.en.md) | 中文
 
 将静读天下（Moon+ Reader）WebDAV 备份中的高亮和批注导入 Obsidian，支持搜索书籍、预览内容和自定义模板。界面随 Obsidian 显示中文或英文，已有缓存可离线使用。
 
-需要 **Obsidian 1.11.5 或更新的桌面版本**，不支持移动端。当前版本为 **0.3.0**，改动见 [CHANGELOG](CHANGELOG.md)。
+需要 **Obsidian 1.11.5 或更新的桌面版本**，不支持移动端。当前版本为 **0.3.1**，改动见 [CHANGELOG](CHANGELOG.md)。
 
 ## 安装
 
-从本仓库的 [GitHub Releases](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases) 下载 `main.js`、`manifest.json` 和 `styles.css`，将三个文件放入笔记库的 `.obsidian/plugins/moonreader-note-sync/`，然后在 Obsidian 的社区插件设置中启用。
+从本仓库的 [GitHub Releases](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases) 下载 `main.js`、`manifest.json` 和 `styles.css`，将三个文件放入笔记库的 `.obsidian/plugins/obsidian-moonreader-sync/`，然后在 Obsidian 的社区插件设置中启用。
 
-也可以下载发布包，将文件直接解压到上述目录。不要用 GitHub 自动生成的源码压缩包代替插件文件。若已手动安装在其他目录，可在原目录更新，避免重复安装。
+GitHub 自动生成的源码压缩包不包含构建后的插件文件。若已手动安装在其他目录，请保留 `data.json` 和缓存，在上述目录更新，避免重复安装。
 
 ## 连接备份
 
@@ -77,6 +87,10 @@
 
 书籍缓存保存在当前插件目录中，按服务器目录和账号分别存储，内容为明文。插件不要求访问笔记库外的文件。
 
+缓存使用 Node.js 文件接口在插件目录内写入临时文件并原子替换；不会扫描或访问其他系统目录。选择导入目标时通过 Obsidian API 获取库内 Markdown 文件路径，不会读取所有笔记正文。插件不使用 localStorage 或 sessionStorage 保存数据。
+
+设置页面仍使用兼容 Obsidian 1.11.5 的接口，尚未接入 1.13 的全局设置搜索。
+
 ## 常见问题
 
 - **找不到书籍：** 确认地址直接指向包含 `.an` 文件的 WebDAV 目录。连接成功但没有笔记文件时，也需要检查静读天下的备份位置。
@@ -109,9 +123,9 @@ npm run dev
 ## 发布
 
 1. 同步更新 `manifest.json`、`package.json`、`package-lock.json` 和 `versions.json`，在 `CHANGELOG.md` 写明改动。
-2. 运行 `npm ci`、`npm run check`、`npm run check:release -- 0.3.0`，检查版本、兼容性映射、许可和构建文件。
-3. 提交源码与发布配置后，推送与版本号完全相同的标签，例如 `0.3.0`，不要加 `v` 前缀。
-4. 发布工作流会重新检查并上传 `main.js`、`manifest.json`、`styles.css` 和安装压缩包。压缩包另含项目许可与第三方许可；三个插件文件也必须单独上传。
+2. 运行 `npm ci`、`npm run check`、`npm run check:release -- 0.3.1`，检查版本、兼容性映射、许可和构建文件。
+3. 提交源码与发布配置后，推送与版本号完全相同的标签，例如 `0.3.1`，不要加 `v` 前缀。
+4. 发布工作流重新检查后，为 `main.js`、`manifest.json`、`styles.css` 生成构建来源证明，并仅上传这三个插件文件。项目许可保留在仓库中，第三方许可包含在 `main.js` 中。
 
 首次申请社区目录收录时，按 [Obsidian 官方提交说明](https://docs.obsidian.md/Plugins/Releasing/Submit%20your%20plugin) 操作。社区目录是否收录，以及 GitHub Release 是否发布，需要分别确认。
 

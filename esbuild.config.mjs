@@ -1,6 +1,6 @@
 import esbuild from "esbuild";
 import process from "process";
-import builtins from "builtin-modules";
+import { builtinModules } from "node:module";
 import { readFile } from "node:fs/promises";
 
 const prod = (process.argv[2] === "production");
@@ -26,7 +26,8 @@ const context = await esbuild.context({
     "@lezer/common",
     "@lezer/highlight",
     "@lezer/lr",
-    ...builtins
+    ...builtinModules,
+    ...builtinModules.map(name => 'node:' + name)
   ],
   format: "cjs",
   target: "es2018",

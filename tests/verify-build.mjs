@@ -16,7 +16,15 @@ assert.equal(manifest.author, pkg.author);
 assert.ok(manifest.name && !/obsidian|plugin/i.test(manifest.name));
 assert.ok(manifest.description.length <= 250 && manifest.description.endsWith('.'));
 assert.equal(manifest.description, pkg.description);
-assert.ok(!manifest.id.includes('obsidian'));
+assert.equal(manifest.id, 'obsidian-moonreader-sync', 'The existing community plugin ID must remain stable');
+assert.ok(!pkg.devDependencies['builtin-modules'], 'Use Node builtinModules rather than an extra dependency');
+const settingsSource = await readFile('src/ui/settingTab.ts', 'utf8');
+assert.ok(!/createEl\(['"]h[1-6]['"]/.test(settingsSource), 'Settings headings must use Setting.setHeading()');
+assert.ok(!(await readFile('src/i18n.ts', 'utf8')).includes('localStorage'), 'Language must use the host API');
+assert.ok(!(await readFile('styles.css', 'utf8')).includes(':has('), 'Avoid broad CSS :has selectors');
+const readme = await readFile('README.md', 'utf8');
+assert.match(readme, /^## Installation$/m);
+assert.match(readme, /^## Usage$/m);
 if (process.argv.includes('--tag')) {
     const tag = process.argv[process.argv.indexOf('--tag') + 1];
     assert.equal(tag, manifest.version, 'Release tag must match manifest version exactly, without a v prefix');

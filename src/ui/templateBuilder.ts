@@ -12,7 +12,8 @@ export class NotePreview extends Component {
         if (this.renderOwner) this.removeChild(this.renderOwner);
         const owner = this.addChild(new Component());
         this.renderOwner = owner;
-        const staging = this.el.ownerDocument.createElement('div');
+        const staging = this.el.createDiv();
+        staging.remove();
         staging.addClass('markdown-rendered');
         try {
             await MarkdownRenderer.render(this.app, text, staging, sourcePath, owner);

@@ -4,13 +4,13 @@ English | [中文](README.md)
 
 Import highlights and annotations from Moon+ Reader WebDAV backups into Obsidian. Search books, preview notes, and customize the import template. The interface follows Obsidian's language setting in English or Chinese, and cached books are available offline.
 
-Requires **Obsidian 1.11.5 or later on desktop**. Mobile is not supported. The current version is **0.3.0**; see [CHANGELOG](CHANGELOG.md) for changes.
+Requires **Obsidian 1.11.5 or later on desktop**. Mobile is not supported. The current version is **0.3.1**; see [CHANGELOG](CHANGELOG.md) for changes.
 
 ## Installation
 
-Download `main.js`, `manifest.json`, and `styles.css` from [GitHub Releases](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases). Place them directly in your vault's `.obsidian/plugins/moonreader-note-sync/` folder, then enable the plugin in Obsidian's community plugin settings.
+Download `main.js`, `manifest.json`, and `styles.css` from [GitHub Releases](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases). Place them directly in your vault's `.obsidian/plugins/obsidian-moonreader-sync/` folder, then enable the plugin in Obsidian's community plugin settings.
 
-You can also extract the release ZIP into that folder. GitHub's automatically generated source archives do not contain the built plugin. If you previously installed it under another folder name, update that folder to avoid a duplicate installation.
+GitHub's automatically generated source archives do not contain the built plugin. If you installed it under another folder name, preserve `data.json` and the cache files when updating to the folder above, and avoid duplicate installations.
 
 ## Connect your backup
 
@@ -77,6 +77,10 @@ Obsidian Keychain manages passwords locally; the plugin configuration stores onl
 
 Book caches are stored as plain text in the plugin folder, separately for each server directory and account. The plugin does not require access to files outside the vault.
 
+The cache uses Node.js filesystem APIs for temporary writes and atomic replacement inside the plugin folder; it does not scan other system directories. The destination picker lists Markdown file paths through Obsidian's vault API without reading all note contents. The plugin does not store data in localStorage or sessionStorage.
+
+Settings still use the API supported by Obsidian 1.11.5 and are not yet indexed by the global settings search introduced in 1.13.
+
 ## Troubleshooting
 
 - **No books found:** Point the URL directly to the WebDAV folder containing `.an` files. If the connection succeeds but finds no annotation files, check Moon+ Reader's backup location.
@@ -109,9 +113,9 @@ The development `obsidian` package pins an older moment dependency; this project
 ## Release process
 
 1. Update `manifest.json`, `package.json`, `package-lock.json`, and `versions.json` together. Describe the changes in `CHANGELOG.md`.
-2. Run `npm ci`, `npm run check`, and `npm run check:release -- 0.3.0` with the intended version to check metadata, compatibility, licenses, and build files.
-3. Commit the source and release configuration, then push a tag matching the version exactly, such as `0.3.0`, without a `v` prefix.
-4. The release workflow checks the build and uploads `main.js`, `manifest.json`, `styles.css`, and an installation ZIP. The ZIP also includes project and third-party licenses. The three plugin files must remain separate release attachments as well.
+2. Run `npm ci`, `npm run check`, and `npm run check:release -- 0.3.1` with the intended version to check metadata, compatibility, licenses, and build files.
+3. Commit the source and release configuration, then push a tag matching the version exactly, such as `0.3.1`, without a `v` prefix.
+4. The release workflow checks the build, generates provenance attestations for `main.js`, `manifest.json`, and `styles.css`, and uploads only these three plugin files. The project license remains in the repository; third-party notices are included in `main.js`.
 
 For a first community-directory submission, follow the [official Obsidian instructions](https://docs.obsidian.md/Plugins/Releasing/Submit%20your%20plugin). A published GitHub release and acceptance into the community directory are separate steps.
 

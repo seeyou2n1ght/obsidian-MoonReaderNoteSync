@@ -1,8 +1,7 @@
 import { getLanguage } from 'obsidian';
 
-// Prefer the host language API; the fallback also supports test hosts.
 export function t(zh: string, en: string): string {
-    const language = typeof getLanguage === 'function' ? getLanguage() : window.localStorage.getItem('language') || 'en';
+    const language = getLanguage();
     return language.startsWith('zh') ? zh : en;
 }
 

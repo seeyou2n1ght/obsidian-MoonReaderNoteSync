@@ -38,9 +38,10 @@
 .moonreader-destination .moonreader-meta { margin-top: 3px; }
 .moonreader-destination > div:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .moonreader-status { line-height: 1.5; overflow-wrap: anywhere; }
-.moonreader-import-feedback { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.moonreader-import-feedback { display: flex; align-items: center; gap: 8px; }
 .moonreader-import-feedback .moonreader-status { flex: 1; font-size: var(--font-ui-small); }
-.moonreader-import-feedback:has(.moonreader-status:empty):has(button[hidden]) { display: none; }
+.moonreader-import-feedback .moonreader-status:empty { display: none; }
+.moonreader-import-feedback .moonreader-status:not(:empty), .moonreader-import-feedback button:not([hidden]) { margin-bottom: 10px; }
 .moonreader-confirmation { border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); padding: 12px; margin-bottom: 12px; display: flex; gap: 8px; align-items: center; }
 .moonreader-confirmation p { margin: 0 auto 0 0; font-size: var(--font-ui-small); }
 .moonreader-confirmation[hidden], .moonreader-library [hidden] { display: none; }

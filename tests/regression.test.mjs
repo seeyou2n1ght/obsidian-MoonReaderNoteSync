@@ -140,7 +140,7 @@ test('settings saves serialize, and a failed save does not change effective sett
 });
 test('legacy migration binds the old account and later account switches keep caches separate', async () => {
     const vault = join(root, 'migration-vault');
-    const pluginDir = '.obsidian/plugins/moonreader-note-sync';
+    const pluginDir = '.obsidian/plugins/obsidian-moonreader-sync';
     await fs.mkdir(join(vault, pluginDir), { recursive: true });
     await fs.writeFile(join(vault, pluginDir, 'moonreader_cache.json'), JSON.stringify([book]));
     const plugin = new Plugin();

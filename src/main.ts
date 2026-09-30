@@ -27,17 +27,18 @@ export default class MoonReaderSyncPlugin extends Plugin {
     renderNotes = renderNotes;
 
     async onload() {
-        const saved = await this.loadData() || {};
+        const raw: unknown = await this.loadData();
+        const saved: Record<string, unknown> = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
         // Only current fields are retained; legacy ciphertext is never loaded or migrated.
         this.settings = {
-            webDavUrl: saved.webDavUrl ?? DEFAULT_SETTINGS.webDavUrl,
-            username: saved.username ?? DEFAULT_SETTINGS.username,
-            secretId: saved.secretId ?? '',
-            bookListLimit: Number.isSafeInteger(saved.bookListLimit) && saved.bookListLimit >= 0 ? saved.bookListLimit : DEFAULT_SETTINGS.bookListLimit,
+            webDavUrl: typeof saved.webDavUrl === 'string' ? saved.webDavUrl : DEFAULT_SETTINGS.webDavUrl,
+            username: typeof saved.username === 'string' ? saved.username : DEFAULT_SETTINGS.username,
+            secretId: typeof saved.secretId === 'string' ? saved.secretId : '',
+            bookListLimit: typeof saved.bookListLimit === 'number' && Number.isSafeInteger(saved.bookListLimit) && saved.bookListLimit >= 0 ? saved.bookListLimit : DEFAULT_SETTINGS.bookListLimit,
             bookListSort: saved.bookListSort === 'title' ? 'title' : DEFAULT_SETTINGS.bookListSort,
             bookListDirection: saved.bookListDirection === 'asc' || saved.bookListDirection === 'desc' ? saved.bookListDirection : saved.bookListSort === 'title' ? 'asc' : DEFAULT_SETTINGS.bookListDirection,
-            insertAction: saved.insertAction ?? DEFAULT_SETTINGS.insertAction,
-            noteTemplate: saved.noteTemplate ?? DEFAULT_SETTINGS.noteTemplate
+            insertAction: saved.insertAction === 'ask' || saved.insertAction === 'append' || saved.insertAction === 'overwrite' ? saved.insertAction : DEFAULT_SETTINGS.insertAction,
+            noteTemplate: typeof saved.noteTemplate === 'string' && saved.noteTemplate.trim() ? saved.noteTemplate : DEFAULT_SETTINGS.noteTemplate
         };
         this.registerEvent(this.app.workspace.on('active-leaf-change', leaf => {
             if (leaf?.view instanceof MarkdownView) this.recentMarkdownView = leaf.view;

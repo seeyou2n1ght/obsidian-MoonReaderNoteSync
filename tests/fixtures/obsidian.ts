@@ -124,6 +124,7 @@ export class Setting {
     }
     setName(name: string) { this.label.setText(name); this.controlEl.querySelectorAll('input,select').forEach(el => el.setAttribute('aria-label', name)); return this; }
     setDesc(desc: string) { this.label.createDiv({ cls: 'moonreader-meta', text: desc }); return this; }
+    setHeading() { this.settingEl.addClass('setting-item-heading'); return this; }
     addButton(fn: any) { fn(new ButtonComponent(this.controlEl)); return this; }
     addText(fn: any) { const text = new TextComponent(this.controlEl); text.inputEl.setAttribute('aria-label', this.label.textContent || ''); fn(text); return this; }
     addDropdown(fn: any) { const d = new DropdownComponent(this.controlEl); d.selectEl.setAttribute('aria-label', this.label.textContent || ''); fn(d); return this; }

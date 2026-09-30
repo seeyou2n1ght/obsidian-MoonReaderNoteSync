@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   build:
@@ -37,9 +39,13 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: npm run check:release -- "$RELEASE_TAG"
 
-      - name: Create Zip Archive
-        run: |
-          zip moonreader-note-sync.zip main.js manifest.json styles.css LICENSE THIRD-PARTY-NOTICES.txt
+      - name: Attest release assets
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
@@ -50,4 +56,3 @@ jobs:
             main.js
             manifest.json
             styles.css
-            moonreader-note-sync.zip

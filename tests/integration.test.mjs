@@ -601,6 +601,20 @@ test('list defaults survive old configurations and invalid persisted preferences
     assert.equal(h.plugin.settings.bookListLimit, 20); assert.equal(h.plugin.settings.bookListSort, 'title');
 });
 
+test('malformed persisted configuration cannot become runtime settings', async t => {
+    const h = await harness(t);
+    for (const data of [null, [], 'invalid', { webDavUrl: 42, username: {}, secretId: false, insertAction: 'invalid', noteTemplate: [] }]) {
+        h.plugin.loadData = async () => data;
+        await h.plugin.onload();
+        assert.equal(typeof h.plugin.settings.webDavUrl, 'string');
+        assert.equal(h.plugin.settings.username, '');
+        assert.equal(h.plugin.settings.secretId, '');
+        assert.equal(h.plugin.settings.insertAction, 'ask');
+        assert.equal(typeof h.plugin.settings.noteTemplate, 'string');
+        assert.ok(h.plugin.settings.noteTemplate.trim());
+    }
+});
+
 test('old credential fields are excluded on load and preferences survive without secret migration', async t => {
     const h = await harness(t);
     h.plugin.loadData = async () => ({ webDavUrl: 'https://fixture.test/dav/', username: 'reader', encryptedPass: 'legacy-ciphertext', keyFilePath: 'unused.key', noteTemplate: '{note}', insertAction: 'append' });
