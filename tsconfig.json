@@ -11,6 +11,7 @@
     "importHelpers": true,
     "strictNullChecks": true,
     "strict": true,
+    "skipLibCheck": true,
     "lib": ["DOM", "ES5", "ES6", "ES7", "ESNext"]
   },
   "include": ["src/**/*.ts"]

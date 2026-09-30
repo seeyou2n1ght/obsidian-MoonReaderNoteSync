@@ -4,13 +4,20 @@ import { build } from 'esbuild';
 import { createRequire } from 'node:module';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import { deflateSync, inflateSync } from 'node:zlib';
 
 const require = createRequire(import.meta.url);
-class FileSystemAdapter { constructor(base) { this.base = base; } getBasePath() { return this.base; } }
+class FileSystemAdapter {
+    constructor(base) { this.base = base; }
+    async exists(path) { try { await fs.stat(join(this.base, path)); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } }
+    read(path) { return fs.readFile(join(this.base, path), 'utf8'); }
+    write(path, text) { return fs.writeFile(join(this.base, path), text); }
+    rename(path, next) { return fs.rename(join(this.base, path), join(this.base, next)); }
+    remove(path) { return fs.unlink(join(this.base, path)); }
+}
 const obsidian = {
-    getLanguage: () => 'en', FileSystemAdapter,
+    getLanguage: () => 'en', FileSystemAdapter, normalizePath: path => path.replaceAll('\\', '/'),
     Plugin: class {}, PluginSettingTab: class {}, Modal: class {}, SuggestModal: class {}, Component: class {}
 };
 const result = await build({
@@ -28,7 +35,9 @@ const module = { exports: {} };
 new Function('require', 'module', 'exports', result.outputFiles[0].text)(
     name => name === 'obsidian' ? obsidian : require(name), module, module.exports
 );
-const { AnParser, renderNotes, mergeNote, readCache, writeCache, sourceId, isBook, syncBooks, WebDAVClient, normalizeWebDavUrl, Plugin } = module.exports;
+const { AnParser, renderNotes, mergeNote, readCache: readVaultCache, writeCache: writeVaultCache, sourceId, isBook, syncBooks, WebDAVClient, normalizeWebDavUrl, Plugin } = module.exports;
+const readCache = (path, source, url) => readVaultCache(new FileSystemAdapter(dirname(path)), basename(path), source, url);
+const writeCache = (path, cache) => writeVaultCache(new FileSystemAdapter(dirname(path)), basename(path), cache);
 const note = { id: '10', bookName: 'Book', chapter: '2', colorHex: '#ffeb3b', timestamp: '2026-01-01 00:00:00', note: '  thought  ', highlightText: 'A passage' };
 const block = ['10', 'Book', 'path', 'path', '2', '0', '3', '8', '-256', '1767225600000', '', note.note, note.highlightText, '0', '0', '0', ''];
 function compressed(lines = block) {
@@ -119,6 +128,22 @@ test('failed cache serialization preserves previous file and removes temporary f
     await assert.rejects(writeCache(path, circular));
     assert.deepEqual(JSON.parse(await fs.readFile(path, 'utf8')), cache);
     assert.equal((await fs.readdir(root)).some(name => name.endsWith('.tmp')), false);
+});
+
+test('vault adapter write and rename failures preserve the previous cache and clean staging files', async () => {
+    const storage = new FileSystemAdapter(root), path = 'adapter-failure.json';
+    const original = { version: 1, source: 'a', checkedAt: '', books: [book] };
+    await writeVaultCache(storage, path, original);
+    for (const operation of ['write', 'rename']) {
+        const failed = Object.create(storage);
+        failed[operation] = async (...args) => {
+            if (operation === 'write') await storage.write(...args);
+            throw new Error('Controlled adapter failure');
+        };
+        await assert.rejects(writeVaultCache(failed, path, { ...original, books: [] }), /Controlled adapter failure/);
+        assert.deepEqual(await readVaultCache(storage, path, 'a', 'https://example.test/dav/'), original);
+        assert.equal((await fs.readdir(root)).some(name => name.endsWith('.tmp')), false);
+    }
 });
 test('WebDAV URLs preserve encoded path characters and reject cross-origin download before auth', async () => {
     assert.equal(normalizeWebDavUrl('https://example.test/dav/a%23b'), 'https://example.test/dav/a%23b/');

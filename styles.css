@@ -51,6 +51,10 @@
 .moonreader-settings .moonreader-status[data-state="tested"] { color: var(--text-warning); }
 .moonreader-empty { padding: 50px 16px; text-align: center; color: var(--text-muted); }
 .moonreader-settings input[type="text"], .moonreader-settings input[type="password"] { width: min(320px, 100%); }
+.moonreader-connection-actions .setting-item-control { flex-wrap: wrap; }
+.moonreader-connection-actions .moonreader-status { flex-basis: 100%; text-align: right; }
+.moonreader-template-setting { flex-direction: column; align-items: stretch; }
+.moonreader-template-setting .setting-item-control { display: block; }
 .moonreader-connection { width: min(760px, 94vw); }
 .moonreader-settings .moonreader-status { font-size: var(--font-ui-small); color: var(--text-muted); margin: 12px 0; }
 .moonreader-settings-template { margin-top: 24px; }

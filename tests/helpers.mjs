@@ -26,7 +26,14 @@ function evaluate(code, window, host) {
 export async function harness(t) {
     const root = await fs.mkdtemp(join(tmpdir(), 'moonreader-integration-'));
     const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'https://fixture.test/?lang=en' });
-    class FileSystemAdapter { constructor(base) { this.base = base; } getBasePath() { return this.base; } }
+    class FileSystemAdapter {
+        constructor(base) { this.base = base; }
+        async exists(path) { try { await fs.stat(join(this.base, path)); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } }
+        read(path) { return fs.readFile(join(this.base, path), 'utf8'); }
+        write(path, text) { return fs.writeFile(join(this.base, path), text); }
+        rename(path, next) { return fs.rename(join(this.base, path), join(this.base, next)); }
+        remove(path) { return fs.unlink(join(this.base, path)); }
+    }
     const host = { ...evaluate(hostCode.outputFiles[0].text, dom.window), FileSystemAdapter, Plugin: class {
         addSettingTab() {} addRibbonIcon() {} addCommand() {} registerEvent() {}
     }, requestUrl: async ({ url, method, headers }) => {

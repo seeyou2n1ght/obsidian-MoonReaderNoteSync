@@ -20,6 +20,10 @@ assert.equal(manifest.id, 'obsidian-moonreader-sync', 'The existing community pl
 assert.ok(!pkg.devDependencies['builtin-modules'], 'Use Node builtinModules rather than an extra dependency');
 const settingsSource = await readFile('src/ui/settingTab.ts', 'utf8');
 assert.ok(!/createEl\(['"]h[1-6]['"]/.test(settingsSource), 'Settings headings must use Setting.setHeading()');
+assert.ok(settingsSource.includes('getSettingDefinitions()'), 'Settings must support native search indexing');
+for (const path of ['src/ui/bookSuggestModal.ts', 'src/ui/templateBuilder.ts', 'src/ui/settingTab.ts']) {
+    assert.ok(!(await readFile(path, 'utf8')).includes('document.createElement'), 'Use native DOM helpers in ' + path);
+}
 assert.ok(!(await readFile('src/i18n.ts', 'utf8')).includes('localStorage'), 'Language must use the host API');
 assert.ok(!(await readFile('styles.css', 'utf8')).includes(':has('), 'Avoid broad CSS :has selectors');
 const readme = await readFile('README.md', 'utf8');
@@ -30,7 +34,7 @@ if (process.argv.includes('--tag')) {
     assert.equal(tag, manifest.version, 'Release tag must match manifest version exactly, without a v prefix');
 }
 assert.equal(versions[manifest.version], manifest.minAppVersion, 'Compatibility map must match manifest');
-assert.equal(manifest.isDesktopOnly, true, 'Node filesystem and crypto require desktop-only manifest');
+assert.equal(manifest.isDesktopOnly, true, 'Node crypto requires desktop-only manifest');
 assert.match(manifest.id, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 assert.ok((await readFile('styles.css', 'utf8')).trim());
 assert.ok((await readFile('LICENSE', 'utf8')).trim());
@@ -52,4 +56,5 @@ new Function('require', 'module', 'exports', code)(name => {
 assert.equal(typeof module.exports.default, 'function', 'Bundle must export an Obsidian plugin');
 assert.ok(new module.exports.default() instanceof host.Plugin);
 assert.ok(imports.has('obsidian'));
+assert.ok(!imports.has('fs') && !imports.has('node:fs') && !imports.has('node:fs/promises'), 'Runtime file access must use the vault adapter');
 console.log('Release bundle loaded with a host stub; assets and version metadata agree. Node ' + process.version);

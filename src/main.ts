@@ -1,5 +1,4 @@
-import { Plugin, FileSystemAdapter, MarkdownView, Modal } from 'obsidian';
-import { join } from 'path';
+import { Plugin, MarkdownView, Modal, normalizePath } from 'obsidian';
 import { MoonReaderSyncSettings, DEFAULT_SETTINGS } from './settings';
 import { MoonReaderWebDAVSettingTab } from './ui/settingTab';
 import { WebDAVClient, normalizeWebDavUrl } from './utils/webdav';
@@ -91,19 +90,18 @@ export default class MoonReaderSyncPlugin extends Plugin {
         return sourceId(normalizeWebDavUrl(this.settings.webDavUrl), this.settings.username);
     }
     private cachePath(source?: string): string {
-        const base = (this.app.vault.adapter as FileSystemAdapter).getBasePath();
-        return join(base, this.manifest.dir!, source ? 'moonreader_cache.' + source + '.json' : 'moonreader_cache.json');
+        return normalizePath(this.manifest.dir! + '/' + (source ? 'moonreader_cache.' + source + '.json' : 'moonreader_cache.json'));
     }
     async loadCache() {
         try {
             const source = this.currentSource();
-            this.cache = await readCache(this.cachePath(source), source, this.settings.webDavUrl);
+            this.cache = await readCache(this.app.vault.adapter, this.cachePath(source), source, this.settings.webDavUrl);
             if (!this.cache.checkedAt && !this.cache.books.length) {
-                const legacy = await readCache(this.cachePath(), source, this.settings.webDavUrl);
+                const legacy = await readCache(this.app.vault.adapter, this.cachePath(), source, this.settings.webDavUrl);
                 if (legacy.books.length) {
                     // Bind the old unscoped array before any connection settings can change.
-                    await writeCache(this.cachePath(), legacy);
-                    await writeCache(this.cachePath(source), legacy);
+                    await writeCache(this.app.vault.adapter, this.cachePath(), legacy);
+                    await writeCache(this.app.vault.adapter, this.cachePath(source), legacy);
                     this.cache = legacy;
                 }
             }
@@ -151,7 +149,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
         const tab = new MoonReaderWebDAVSettingTab(this.app, this, () => { modal.close(); this.openLibrary(); }, true);
         tab.containerEl = modal.contentEl;
         modal.onClose = () => { tab.hide(); this.connectionModal = null; };
-        tab.display();
+        tab.renderConnection();
         modal.open();
     }
     async refresh() {
@@ -181,7 +179,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
                 }, () => this.disposed);
             if (this.disposed || source !== this.currentSource()) return;
             const next: BookCache = { version: 1, source, checkedAt: result.checkedAt, books: result.books };
-            await writeCache(this.cachePath(source), next);
+            await writeCache(this.app.vault.adapter, this.cachePath(source), next);
             this.cache = next;
             this.status = t('刷新完成', 'Refresh complete') + ': ' + result.updated + t(' 本更新，', ' updated, ') +
                 result.unchanged + t(' 本未变化，', ' unchanged, ') + result.failed + t(' 本失败。', ' failed.');

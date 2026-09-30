@@ -615,6 +615,28 @@ test('malformed persisted configuration cannot become runtime settings', async t
     }
 });
 
+test('declarative settings index every editable field without creating UI or saving drafts', async t => {
+    const h = await harness(t);
+    const tab = new h.MoonReaderWebDAVSettingTab(h.app, h.plugin);
+    const definitions = tab.getSettingDefinitions();
+    const names = definitions.flatMap(group => group.items || [group]).map(item => item.name);
+    assert.ok(names.includes('WebDAV folder URL'));
+    assert.ok(names.includes('Username'));
+    assert.ok(names.includes('Password or app password'));
+    assert.ok(names.includes('Books shown'));
+    assert.ok(names.includes('Default import mode'));
+    assert.ok(names.includes('Default note template'));
+    assert.equal(tab.containerEl.childElementCount, 0);
+    assert.equal(h.state.saves, 0); assert.equal(h.secretState.writes, 0);
+    h.document.body.append(tab.containerEl); tab.display();
+    change(h, input(tab.containerEl, 'Username'), 'unsaved-draft');
+    tab.getSettingDefinitions();
+    assert.equal(input(tab.containerEl, 'Username').value, 'unsaved-draft');
+    tab.hide(); tab.display();
+    assert.equal(input(tab.containerEl, 'Username').value, h.plugin.settings.username);
+    assert.equal(h.state.saves, 0); tab.hide();
+});
+
 test('old credential fields are excluded on load and preferences survive without secret migration', async t => {
     const h = await harness(t);
     h.plugin.loadData = async () => ({ webDavUrl: 'https://fixture.test/dav/', username: 'reader', encryptedPass: 'legacy-ciphertext', keyFilePath: 'unused.key', noteTemplate: '{note}', insertAction: 'append' });

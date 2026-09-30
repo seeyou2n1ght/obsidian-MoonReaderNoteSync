@@ -1,108 +1,100 @@
 # MoonReader Note Sync
 
-Import Moon+ Reader highlights and annotations from WebDAV backups into Obsidian. Browse books, preview annotations, and import them into an open note. Requires Obsidian 1.11.5+ on desktop.
+English | [中文](README.zh-CN.md)
+
+Import highlights and annotations from Moon+ Reader WebDAV backups into Obsidian. Search books, preview notes, and customize the import template. The interface follows Obsidian's language setting in English or Chinese, and cached books are available offline.
+
+Requires **Obsidian 1.13.0 or later on desktop**. Mobile is not supported. The current version is **0.3.2**; see [CHANGELOG](CHANGELOG.md) for changes.
 
 ## Installation
 
-Download `main.js`, `manifest.json`, and `styles.css` from [GitHub Releases](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases). Place them in `.obsidian/plugins/obsidian-moonreader-sync/` in your vault and enable MoonReader Note Sync in Community plugins.
+Download `main.js`, `manifest.json`, and `styles.css` from [GitHub Releases](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases). Place them directly in your vault's `.obsidian/plugins/obsidian-moonreader-sync/` folder, then enable the plugin in Obsidian's community plugin settings.
+
+GitHub's automatically generated source archives do not contain the built plugin. If you installed it under another folder name, preserve `data.json` and the cache files when updating to the folder above, and avoid duplicate installations.
 
 ## Usage
 
-Set the WebDAV backup folder, username, and password in plugin settings. Use **Test connection**, then **Save connection**. Open the library from the ribbon, select a book, check the preview and destination, then import. [Full English instructions](README.en.md) follow the same workflow as the Chinese guide below.
+### Connect your backup
 
-[English](README.en.md) | 中文
+First, back up your reading annotations to WebDAV from Moon+ Reader. Check that the backup folder contains `.an` files.
 
-将静读天下（Moon+ Reader）WebDAV 备份中的高亮和批注导入 Obsidian，支持搜索书籍、预览内容和自定义模板。界面随 Obsidian 显示中文或英文，已有缓存可离线使用。
+1. Open the plugin settings and enter the WebDAV folder URL, username, and password or app password.
+2. Optionally select **Test connection** to check folder access. Testing does not save settings.
+3. Select **Save connection**. After validation, the password is stored in Obsidian Keychain.
+4. Open the library from the ribbon button or the **Browse and import notes** command. Books are fetched automatically if there is no cache. Use the refresh button for later updates.
 
-需要 **Obsidian 1.11.5 或更新的桌面版本**，不支持移动端。当前版本为 **0.3.1**，改动见 [CHANGELOG](CHANGELOG.md)。
+If setup is incomplete, refreshing shows an explanation. The library's settings button opens the connection form; import preferences and the default template are available in the full plugin settings.
 
-## 安装
+### Upgrading from an older version
 
-从本仓库的 [GitHub Releases](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/releases) 下载 `main.js`、`manifest.json` 和 `styles.css`，将三个文件放入笔记库的 `.obsidian/plugins/obsidian-moonreader-sync/`，然后在 Obsidian 的社区插件设置中启用。
+Version 0.2.0 no longer uses a separate key file or migrates old passwords. Re-enter your password once and save the connection. The server URL, username, template, and cache can be retained. Old key files are not deleted automatically.
 
-GitHub 自动生成的源码压缩包不包含构建后的插件文件。若已手动安装在其他目录，请保留 `data.json` 和缓存，在上述目录更新，避免重复安装。
+## Import notes
 
-## 连接备份
+Search or select a book on the left. The right pane previews the first three annotations, and the footer shows the destination and insertion mode. **Insert N notes** imports all annotations from the selected book.
 
-先在静读天下中将阅读批注备份到 WebDAV，确认备份目录中有 `.an` 文件。
+- By default, notes are inserted at the cursor position captured when the panel opened. Selected text is not replaced. If another pane has focus, the plugin uses the most recent Markdown note that is still open.
+- If no destination note is open, select **Choose note**, choose a file, then select **Append N notes**.
+- **More** lets you append, change the destination, or replace the body. Replacement requires confirmation and preserves the file's leading YAML properties.
+- **Adjust template** shows available fields. Click or drag a field into the template. Changes apply to this import unless you select **Save as default template**.
+- Importing the same book into the same note again during one plugin session requires **Import again** confirmation. Canceling or closing before writing does not write anything; closing during a write waits for it to finish.
 
-1. 打开插件设置，填写 WebDAV 目录地址、账号、密码或应用密码。
-2. 可点击“测试连接”，确认能够读取目录。测试不会保存设置。
-3. 点击“保存连接”。验证成功后，密码存入 Obsidian 原生密钥库。
-4. 打开侧栏的书库按钮，或执行“浏览和导入笔记”命令。没有缓存时会自动获取书籍；之后点击右上角刷新即可更新。
+Use the arrow keys in the search field to select a book. Enter focuses the import button. Ctrl/Cmd+Enter inserts or appends; it cannot bypass replacement or repeated-import confirmation.
 
-连接未完成时，刷新会提示原因。书库右上角的设置按钮打开连接表单，默认写入方式和模板在完整插件设置中调整。
+**There is no deduplication across sessions or two-way synchronization.** Repeated imports may create duplicate content and block IDs. Importing does not delete or modify remote backups.
 
-### 从旧版升级
+### Library display settings
 
-0.2.0 不再使用独立 key 文件，也不迁移旧密码。升级后需重新输入一次密码并保存。服务器地址、账号、模板和缓存仍可保留；旧 key 文件不会自动删除。
+The row above the book list shows the count and current order, such as **Modified ↓**. Click the order button to choose modification time or title, and ascending or descending order, from an Obsidian native menu. Changes apply immediately and are saved for the next time you open the library. **Books shown** remains in the full plugin settings. The defaults show all books, ordered by backup modification time, newest first.
 
-## 导入笔记
+- Enter a non-negative integer for the display limit. `0` shows all books. This changes only the list, not refreshes, downloads, or the cache. The list shows the visible count and the total number of matches.
+- Search matches all cached books before sorting and applying the limit, so books beyond the limit can still be found by searching.
+- Date means the **WebDAV backup file's modification time**, not reading time, annotation time, or download time. Books with missing or invalid dates appear last. Equal dates are ordered by title.
+- Switching to title defaults to ascending order, ignores case, and compares embedded numbers numerically: Book 2 precedes Book 10. Letter order follows the system locale. Switching to modification time defaults to descending order. Both directions are available for either field.
+- Sorting preserves the search and selected book. If the display limit hides that book, the first visible book is selected and its preview appears. Connection hints are hidden once configured. The footer shows the destination filename, with the full path on hover; replacement confirmation still shows the full path.
 
-打开书库后，左侧搜索或选择书籍，右侧预览前 3 条批注；底部显示目标笔记及写入位置。点击“插入 N 条”会导入该书全部批注。
+These features are available from 0.3.0. Handling of missing books has not changed.
 
-- 默认插入到打开面板时记录的光标位置，不替换选中的文本。焦点在其他面板时，使用仍打开的最近 Markdown 笔记。
-- 没有打开的目标笔记时，先点击“选择笔记”，选中后再点击“追加 N 条”。
-- “更多”菜单可切换文末追加、更换目标或替换正文。替换需要确认，并保留文件开头的 YAML 属性。
-- “调整模板”显示可用字段，点击或拖动字段可插入模板。修改只用于本次导入，点击“保存为默认模板”才会保存。
-- 同一次插件运行期间，向同一笔记重复导入同一本书时，需要点击“仍然导入”。写入开始前取消或关闭面板不会写入；写入已经开始时，关闭会等待结果。
+Checks for these additions passed on Node 22 and 24: 50 tests passed and the private-sample test was skipped. Coverage includes limits, both sort directions, selection retention, search across all books, unrestricted downloads, failed saves, and defaults for old configurations. Manual checks in Windows Obsidian 1.13.7 covered the native menu, order changes, selection retention, and the simplified layout. Remote refreshes and note writes were not repeated in this round.
 
-搜索框中可用上下键选书，Enter 聚焦导入按钮，Ctrl/Cmd+Enter 执行插入或追加。快捷键不能跳过替换或重复导入确认。
+## Template fields
 
-**插件没有跨会话去重，也不做双向同步。** 再次导入可能产生重复内容和块 ID。导入不会删除或修改服务器上的备份。
-
-### 书库显示设置
-
-书籍列表上方显示数量和当前排序，例如“修改时间 ↓”。点击排序按钮，在 Obsidian 原生菜单中选择修改时间或书名，以及升序或降序；选择后立即更新并自动保存，下次打开沿用。显示数量在完整插件设置中调整。默认显示全部书籍，按备份修改时间从新到旧排列。
-
-- 显示数量填写非负整数，`0` 表示全部。限制只影响列表，不影响刷新、下载或缓存；列表显示当前可见数量与匹配总数。
-- 搜索先匹配全部缓存书籍，再排序和应用数量限制，因此超过显示数量的书籍仍可通过搜索找到。
-- 日期使用 **WebDAV 备份文件的修改时间**，不是阅读时间、批注时间或下载时间。日期缺失或无效时排在最后，日期相同则按标题排列。
-- 切换到书名时默认升序，不区分大小写，标题中的数字按数值排列，例如 Book 2 在 Book 10 前面；字母顺序遵循系统语言区域。切换到修改时间时默认降序，两种排序均可调整方向。
-- 排序保留搜索和当前选书；当前书籍被数量限制隐藏时，选中第一本并同步预览。已配置连接时不再重复显示连接提示。底部显示目标文件名，悬停可查看完整路径，替换确认仍显示完整路径。
-
-这些功能从 0.3.0 开始提供；没有改动缺失书籍的处理方式。
-
-本次新增功能的检查在 Node 22 和 24 通过：50 项通过、私人样本项跳过，包含数量限制、升降序、选书保留、完整搜索、下载不受限制、保存失败和旧配置默认值检查。Windows Obsidian 1.13.7 中已验证排序菜单、切换排序、选书保留和精简布局；本轮未重新验证远端刷新或笔记写入。
-
-## 模板字段
-
-| 字段 | 内容 |
+| Field | Value |
 | --- | --- |
-| `{bookName}` | 书名 |
-| `{chapter}` | 章节索引 |
-| `{highlightText}` | 高亮文本 |
-| `{note}` | 个人批注 |
-| `{color}` | RGB 十六进制颜色 |
-| `{timestamp}` | UTC 时间文本 |
-| `{id}` | 原始批注 ID |
+| `{bookName}` | Book title |
+| `{chapter}` | Chapter index |
+| `{highlightText}` | Highlighted text |
+| `{note}` | Personal annotation |
+| `{color}` | RGB hexadecimal color |
+| `{timestamp}` | UTC time text |
+| `{id}` | Original annotation ID |
 
-模板支持 Markdown 和 HTML。字段值会进行 HTML 转义，预览和导入使用相同的替换方式。
+Templates support Markdown and HTML. Field values are HTML-escaped. Preview and import use the same substitution logic.
 
-## 数据与网络
+## Data and network access
 
-插件需要访问你配置的 WebDAV 服务，使用该服务的账号读取备份目录和 `.an` 文件。没有遥测、广告或额外的联网服务。
+The plugin connects to the WebDAV service you configure, using that service's account to read the backup directory and `.an` files. It has no telemetry, advertisements, or additional network services.
 
-密码由 Obsidian 原生密钥库在本地管理，插件配置只保存凭据名称。换设备时需重新填写密码。已有密码时可留空保留；更换账号或服务器时必须重新输入。更新密码不会覆盖旧凭据，未使用的旧条目可在 Obsidian 密钥库中管理。
+Obsidian Keychain manages passwords locally; the plugin configuration stores only a credential name. Configure the password again on another device. Leave the password field blank to keep an existing password; changing the account or server requires re-entering it. Password updates do not overwrite old credentials. Unused entries can be managed in Obsidian Keychain.
 
-书籍缓存保存在当前插件目录中，按服务器目录和账号分别存储，内容为明文。插件不要求访问笔记库外的文件。
+Book caches are stored as plain text in the plugin folder, separately for each server directory and account. The plugin does not require access to files outside the vault.
 
-缓存使用 Node.js 文件接口在插件目录内写入临时文件并原子替换；不会扫描或访问其他系统目录。选择导入目标时通过 Obsidian API 获取库内 Markdown 文件路径，不会读取所有笔记正文。插件不使用 localStorage 或 sessionStorage 保存数据。
+The cache uses the Obsidian vault adapter for temporary writes and replacement inside the plugin folder; it does not access the system filesystem directly. The destination picker lists Markdown file paths through Obsidian's vault API without reading all note contents. The plugin does not store data in localStorage or sessionStorage.
 
-设置页面仍使用兼容 Obsidian 1.11.5 的接口，尚未接入 1.13 的全局设置搜索。
+Settings use the Obsidian declarative API. Connection fields, display limits, import mode, and the default template appear in global settings search. Connection drafts are saved only after validation.
 
-## 常见问题
+## Troubleshooting
 
-- **找不到书籍：** 确认地址直接指向包含 `.an` 文件的 WebDAV 目录。连接成功但没有笔记文件时，也需要检查静读天下的备份位置。
-- **认证或权限失败：** 检查账号、应用密码和目录读取权限。密码不可用时，重新输入并保存。
-- **某本书更新失败：** 原有缓存会保留并标记失败，可再次刷新。无法读取整个目录时，所有缓存都会保留。
-- **服务器删掉了一本书：** 成功刷新后，该书从缓存列表移除，已导入的 Markdown 不受影响。
-- **提示原笔记已变化：** 面板打开后笔记内容发生变化时，不会继续使用旧光标；可以改为文末追加。
-- **备份格式不支持：** 当前解析器支持已验证的固定 17 行记录格式。损坏或不完整的记录会报错，避免用不完整内容覆盖缓存。
+- **No books found:** Point the URL directly to the WebDAV folder containing `.an` files. If the connection succeeds but finds no annotation files, check Moon+ Reader's backup location.
+- **Authentication or access denied:** Check the username, app password, and folder read permissions. Re-enter and save the password if the stored credential is unavailable.
+- **A book fails to update:** Its previous cache is retained and marked as failed. Refresh again to retry. If the entire directory cannot be read, all cached books are retained.
+- **A book was removed remotely:** After a successful refresh it disappears from the cached list. Imported Markdown files are unchanged.
+- **The original note changed:** If the note changes after opening the panel, insertion at the old cursor is refused. You can switch to appending instead.
+- **Unsupported backup format:** The parser currently supports the verified fixed 17-line record format. Corrupt or incomplete records cause an error, preventing partial data from overwriting a complete cache.
 
-## 开发与验证
+## Development and validation
 
-使用 Node.js 22：
+Use Node.js 22:
 
 ```sh
 npm ci
@@ -110,25 +102,29 @@ npm run check
 npm run dev
 ```
 
-`npm run check` 执行类型检查、自动测试、生产构建和发布文件检查。测试分为解析与缓存回归、HTTP 与界面集成两部分；界面测试使用 jsdom 和 Obsidian 接口替身，不等同于真实宿主验证。私人 `.an` 样本可放在已忽略的 `.testdata/`，没有样本时对应测试会跳过。
+`npm run check` runs type checking, automated tests, a production build, and release file checks. Tests cover parser/cache regressions and HTTP/UI integration. UI tests use jsdom and explicit Obsidian substitutes; they do not replace testing in the actual app. Private `.an` samples can be placed in the ignored `.testdata/` folder. That test is skipped when no samples are present.
 
-真实宿主的手动验证可运行 `node tests/fixtures/webdav-server.mjs`。该服务仅监听 `127.0.0.1:60923`，目录为 `/dav/`，合成账号为 `native-qa`，合成密码为 `synthetic-native-password`。数据会先经过实际解析器检查。使用独立测试笔记验证连接、保存、刷新和各种写入方式，结束后恢复原连接并停止服务。
+For manual testing in Obsidian, run `node tests/fixtures/webdav-server.mjs`. It listens only on `127.0.0.1:60923`, serves `/dav/`, and uses the synthetic username `native-qa` and password `synthetic-native-password`. Its data is checked by the actual parser before startup. Use a separate test note to check connection testing, saving, refreshing, and import modes. Restore your connection and stop the service afterward.
 
-0.2.0 发布前检查在 Node 22、24 和独立安装目录中均为 44 项通过、私人样本项跳过；构建文件哈希一致，标签检查和安装压缩包核对通过，依赖审计为 0 项已知漏洞。该版本的 GitHub 构建和发布工作流均已通过。
+For 0.3.2, checks passed on Node 22 and 24: 53 tests passed and the private-sample test was skipped. In Windows Obsidian 1.13.7, manual checks confirmed global settings search, connection testing without saving drafts, connection saving, initial cache writes, and replacement of existing cache files using a local synthetic backup. Original connection and cache files were restored and their hashes checked afterward. Note imports and real remote services were not retested in this round.
 
-此前在 Windows Obsidian 1.13.7 的手动验证已覆盖连接、原生密码保存与读取、刷新、插入、追加、替换、重复导入确认、模板字段和长书名，使用的是合成账号和本地服务；此前还核对了私人样本的 44 条记录。真实 WebDAV 服务、最低版本 Obsidian 1.11.5、其他操作系统和应用重启后的凭据读取尚未验证。
+For 0.2.0, checks passed on Node 22, Node 24, and an independent installation: 44 tests passed and the private-sample test was skipped. Build hashes matched, tag and ZIP checks passed, and the dependency audit reported no known vulnerabilities. GitHub build and release workflows also passed.
 
-开发依赖中的 `obsidian` 包固定依赖旧版 moment，本项目通过 `overrides` 使用修复版本 2.31.0。它仅供开发类型检查使用，不包含在发布文件中，也不替换 Obsidian 宿主的依赖。
+Earlier manual checks in Windows Obsidian 1.13.7 covered connection testing, native password storage and retrieval, refreshes, cursor insertion, appending, replacement, repeated-import confirmation, template fields, and long titles using synthetic accounts and a local server. An earlier private-sample check compared 44 records. Real remote WebDAV services, Obsidian 1.13.0, other operating systems, and password retrieval after a full app restart remain untested.
 
-## 发布
+The development `obsidian` package pins an older moment dependency; this project overrides it with the patched 2.31.0 version. It is used only for development type checking, is excluded from the release bundle, and does not replace Obsidian's own dependencies.
 
-1. 同步更新 `manifest.json`、`package.json`、`package-lock.json` 和 `versions.json`，在 `CHANGELOG.md` 写明改动。
-2. 运行 `npm ci`、`npm run check`、`npm run check:release -- 0.3.1`，检查版本、兼容性映射、许可和构建文件。
-3. 提交源码与发布配置后，推送与版本号完全相同的标签，例如 `0.3.1`，不要加 `v` 前缀。
-4. 发布工作流重新检查后，为 `main.js`、`manifest.json`、`styles.css` 生成构建来源证明，并仅上传这三个插件文件。项目许可保留在仓库中，第三方许可包含在 `main.js` 中。
+`skipLibCheck` skips checks inside dependency declarations because the Obsidian 1.13.1 SDK declarations omit `onHistoryBack` from three classes implementing `HistoryHandler`. Strict checking remains enabled for project code.
 
-首次申请社区目录收录时，按 [Obsidian 官方提交说明](https://docs.obsidian.md/Plugins/Releasing/Submit%20your%20plugin) 操作。社区目录是否收录，以及 GitHub Release 是否发布，需要分别确认。
+## Release process
 
-## 许可证
+1. Update `manifest.json`, `package.json`, `package-lock.json`, and `versions.json` together. Describe the changes in `CHANGELOG.md`.
+2. Run `npm ci`, `npm run check`, and `npm run check:release -- 0.3.2` with the intended version to check metadata, compatibility, licenses, and build files.
+3. Commit the source and release configuration, then push a tag matching the version exactly, such as `0.3.2`, without a `v` prefix.
+4. The release workflow checks the build, generates provenance attestations for `main.js`, `manifest.json`, and `styles.css`, and uploads only these three plugin files. The project license remains in the repository; third-party notices are included in `main.js`.
 
-项目使用 [ISC](LICENSE) 许可证，保留原有版权声明。发布文件包含 [pako](https://github.com/nodeca/pako) 的解压代码，使用 MIT 和 Zlib 许可证；完整声明见 [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt)，也会包含在 `main.js` 中。
+For a first community-directory submission, follow the [official Obsidian instructions](https://docs.obsidian.md/Plugins/Releasing/Submit%20your%20plugin). A published GitHub release and acceptance into the community directory are separate steps.
+
+## License
+
+The project uses the [ISC license](LICENSE), retaining the existing copyright notice. The release bundles decompression code from [pako](https://github.com/nodeca/pako), licensed under MIT and Zlib. Full notices are in [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) and are also included in `main.js`.

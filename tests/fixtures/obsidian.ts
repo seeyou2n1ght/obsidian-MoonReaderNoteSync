@@ -15,6 +15,7 @@ HTMLElement.prototype.addClass = function(name) { this.classList.add(name); };
 HTMLElement.prototype.empty = function() { this.replaceChildren(); };
 HTMLElement.prototype.setText = function(text) { this.textContent = text; };
 export const getLanguage = () => new URLSearchParams(location.search).get('lang') || 'zh';
+export const normalizePath = (path: string) => path.replaceAll('\\', '/');
 export class Component {
     children: Component[] = []; loaded = false;
     addChild<T extends Component>(child: T): T { this.children.push(child); if (this.loaded) child.load(); return child; }
@@ -114,6 +115,23 @@ export class TextComponent {
 export class PluginSettingTab {
     containerEl = document.createElement('div');
     constructor(public app: any, _plugin: any) {}
+    getSettingDefinitions(): any[] { return []; }
+    display() {
+        this.containerEl.empty();
+        const render = (definitions: any[], container: HTMLElement, parentGroup?: SettingGroup) => {
+            for (const definition of definitions) {
+                if (definition.type === 'group') {
+                    const group = new SettingGroup(container).setHeading(definition.heading || '');
+                    if (definition.cls) group.listEl.addClass(definition.cls);
+                    render(definition.items || [], group.listEl, group);
+                } else {
+                    const setting = new Setting(container).setName(definition.name).setDesc(definition.desc || '');
+                    definition.render?.(setting, parentGroup || new SettingGroup(container));
+                }
+            }
+        };
+        render(this.getSettingDefinitions(), this.containerEl);
+    }
 }
 export class Setting {
     settingEl: HTMLElement; controlEl: HTMLElement; label: HTMLElement;
@@ -130,6 +148,11 @@ export class Setting {
     addDropdown(fn: any) { const d = new DropdownComponent(this.controlEl); d.selectEl.setAttribute('aria-label', this.label.textContent || ''); fn(d); return this; }
 }
 export class MarkdownView {}
+export class SettingGroup {
+    listEl: HTMLElement;
+    constructor(container: HTMLElement) { this.listEl = container.createDiv(); }
+    setHeading(text: string) { new Setting(this.listEl).setName(text).setHeading(); return this; }
+}
 export class TFile {}
 export const MarkdownRenderer = { async render(_app: unknown, text: string, el: HTMLElement) {
     // Only representative blockquote rendering; real Markdown renderer still needs host QA.
