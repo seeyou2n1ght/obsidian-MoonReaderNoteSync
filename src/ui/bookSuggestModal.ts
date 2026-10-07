@@ -139,9 +139,9 @@ export class BookSuggestModal extends Modal {
                 type: 'button', role: 'option', 'aria-selected': String(candidate === book), tabindex: candidate === book ? '0' : '-1', title: candidate.bookName,
                 id: 'moonreader-book-' + this.shownBooks.indexOf(candidate)
             } });
-            row.createEl('span', { text: candidate.bookName });
+            row.createSpan({ text: candidate.bookName });
             row.createEl('small', { text: String(candidate.notes.length), cls: 'moonreader-meta' });
-            if (candidate.syncError) row.createEl('span', { cls: 'moonreader-book-error', text: '!', attr: { 'aria-label': candidate.syncError, title: candidate.syncError } });
+            if (candidate.syncError) row.createSpan({ cls: 'moonreader-book-error', text: '!', attr: { 'aria-label': candidate.syncError, title: candidate.syncError } });
             row.addEventListener('click', () => { if (!this.panel.busy) { this.selected = candidate.fileHref; this.renderBooks(); } });
         }
         this.inputEl.setAttribute('aria-controls', this.list.id ||= 'moonreader-book-list');

@@ -22,8 +22,12 @@ const settingsSource = await readFile('src/ui/settingTab.ts', 'utf8');
 assert.ok(!/createEl\(['"]h[1-6]['"]/.test(settingsSource), 'Settings headings must use Setting.setHeading()');
 assert.ok(settingsSource.includes('getSettingDefinitions()'), 'Settings must support native search indexing');
 for (const path of ['src/ui/bookSuggestModal.ts', 'src/ui/templateBuilder.ts', 'src/ui/settingTab.ts']) {
-    assert.ok(!(await readFile(path, 'utf8')).includes('document.createElement'), 'Use native DOM helpers in ' + path);
+    const source = await readFile(path, 'utf8');
+    assert.ok(!source.includes('document.createElement'), 'Use native DOM helpers in ' + path);
+    assert.ok(!/\.createEl\(['"](?:div|span)['"]/.test(source), 'Use createDiv/createSpan shorthand helpers in ' + path);
 }
+const webdavSource = await readFile('src/utils/webdav.ts', 'utf8');
+assert.ok(!/(?<![\w.])(?:setTimeout|clearTimeout)\s*\(/.test(webdavSource), 'Use window timer APIs for connection checks');
 assert.ok(!(await readFile('src/i18n.ts', 'utf8')).includes('localStorage'), 'Language must use the host API');
 assert.ok(!(await readFile('styles.css', 'utf8')).includes(':has('), 'Avoid broad CSS :has selectors');
 const readme = await readFile('README.md', 'utf8');

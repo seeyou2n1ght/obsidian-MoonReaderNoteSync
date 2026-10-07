@@ -220,7 +220,7 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
                 const section = setting.controlEl.createDiv({ cls: 'moonreader-credential-controls' });
                 credentialDetails = section.createDiv({ cls: 'moonreader-credential', attr: { 'aria-live': 'polite' } });
                 const heading = credentialDetails.createDiv({ cls: 'moonreader-credential-heading' });
-                heading.createEl('span', { text: t('当前使用', 'Currently using') });
+                heading.createSpan({ text: t('当前使用', 'Currently using') });
                 credentialName = credentialDetails.createEl('code', { cls: 'moonreader-credential-name' });
                 existingControls = section.createDiv({ cls: 'moonreader-existing-credential' });
                 savedLabel = existingControls.createEl('label', { cls: 'moonreader-saved-label', text: t('已保存的 Keychain', 'Saved Keychains') });

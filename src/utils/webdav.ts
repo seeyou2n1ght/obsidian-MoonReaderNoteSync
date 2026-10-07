@@ -34,12 +34,12 @@ export class WebDAVClient {
         if (!password) throw new UserError(t('请填写 WebDAV 密码。', 'Enter your WebDAV password.'));
         const cancelled = () => new UserError(t('连接检查已取消。', 'Connection check cancelled.'));
         if (this.signal?.aborted) throw cancelled();
-        let timer: ReturnType<typeof setTimeout> | undefined;
+        let timer: number | undefined;
         let abort: (() => void) | undefined;
         const interruption = new Promise<never>((_, reject) => {
             abort = () => reject(cancelled());
             this.signal?.addEventListener('abort', abort, { once: true });
-            if (this.timeoutMs !== undefined) timer = setTimeout(() => reject(new UserError(t('连接检查超时，请检查服务器后重试。', 'Connection check timed out. Check the server and retry.'))), this.timeoutMs);
+            if (this.timeoutMs !== undefined) timer = window.setTimeout(() => reject(new UserError(t('连接检查超时，请检查服务器后重试。', 'Connection check timed out. Check the server and retry.'))), this.timeoutMs);
         });
         try {
             // requestUrl has no abort API; stop waiting and discard its late response.
@@ -50,7 +50,7 @@ export class WebDAVClient {
             if (response.status < 200 || response.status >= 300) throw Object.assign(new Error('WebDAV request failed'), { status: response.status });
             return response;
         } finally {
-            if (timer !== undefined) clearTimeout(timer);
+            if (timer !== undefined) window.clearTimeout(timer);
             if (abort) this.signal?.removeEventListener('abort', abort);
         }
     }

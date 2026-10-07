@@ -1,6 +1,6 @@
 // Minimal host for controlled UI tests. This is not an Obsidian emulator.
 declare global { interface HTMLElement {
-    createEl(tag: string, options?: any): any; createDiv(options?: any): any;
+    createEl(tag: string, options?: any): any; createDiv(options?: any): any; createSpan(options?: any): any;
     addClass(name: string): void; empty(): void; setText(text: string): void;
 } }
 HTMLElement.prototype.createEl = function(tag, options = {}) {
@@ -11,6 +11,7 @@ HTMLElement.prototype.createEl = function(tag, options = {}) {
     this.append(el); return el;
 };
 HTMLElement.prototype.createDiv = function(options = {}) { return this.createEl('div', options); };
+HTMLElement.prototype.createSpan = function(options = {}) { return this.createEl('span', options); };
 HTMLElement.prototype.addClass = function(name) { this.classList.add(name); };
 HTMLElement.prototype.empty = function() { this.replaceChildren(); };
 HTMLElement.prototype.setText = function(text) { this.textContent = text; };

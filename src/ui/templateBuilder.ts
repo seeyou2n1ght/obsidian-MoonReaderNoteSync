@@ -44,7 +44,7 @@ export class TemplateBuilderUI {
             const value = '{' + field + '}';
             const button = fields.createEl('button', { attr: { type: 'button', title: label + ' · ' + t('点击或拖入模板', 'Click or drag into the template'), 'aria-label': label + ' ' + value } });
             button.createEl('code', { text: value });
-            button.createEl('span', { text: label });
+            button.createSpan({ text: label });
             button.draggable = true;
             button.addEventListener('click', () => insert(value));
             button.addEventListener('dragstart', event => event.dataTransfer?.setData('text/plain', value));
