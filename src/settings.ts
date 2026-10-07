@@ -6,7 +6,7 @@ export interface MoonReaderSyncSettings {
     bookListSort: 'backup-date' | 'title';
     bookListDirection: 'asc' | 'desc';
     
-    insertAction: "ask" | "append" | "overwrite";
+    insertAction: "ask" | "append";
     
     noteTemplate: string;
 }

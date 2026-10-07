@@ -37,7 +37,7 @@ Back up annotations to WebDAV from Moon+ Reader and locate the folder containing
 
 Keychain names accept lowercase letters, numbers and dashes, up to 64 characters. Existing names cannot be overwritten. Changing the account or server requires choosing a credential again. Manage existing entries in Obsidian Keychain.
 
-Checks time out after 30 seconds and can be cancelled. Closing settings discards drafts and cancels saves that have not started writing; a save already writing finishes and switches the library to the new connection.
+Each WebDAV request times out after 30 seconds, including folder listings and annotation downloads during refresh. Connection checks can also be cancelled. Closing settings discards drafts and cancels saves that have not started writing; a save already writing finishes and switches the library to the new connection.
 
 ### Import notes
 
@@ -83,7 +83,7 @@ Book caches are plain text in the plugin folder, separated by server directory a
 - **No books found:** Check that the selected folder contains `.an` files; a successful connection alone does not confirm the backup location.
 - **Authentication fails:** Check the username, app password and folder permissions; select another Keychain or create one if its password is unavailable.
 - **A book fails to update:** Its previous data remains available. Refresh to retry; the parser rejects corrupt or incomplete records.
-- **The original note changed:** Switch to appending, or reopen the library to capture a new cursor position.
+- **The original note closed or changed:** Switch to appending, or open the target note and reopen the library to capture a new cursor position.
 
 Report problems through [GitHub Issues](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/issues).
 

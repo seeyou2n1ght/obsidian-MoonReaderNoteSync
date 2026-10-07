@@ -184,9 +184,10 @@ export class ImportPanel extends Component {
             const text = this.plugin.renderNotes(book.notes, this.template);
             if (!text.trim()) throw new UserError(t('模板生成了空内容，请调整模板。', 'The template produced empty content. Adjust the template.'));
             if (action === 'cursor') {
-                if (!this.view || this.view.file !== target || !this.initialCursor || this.view.editor.getValue() !== this.initialEditorText) {
+                if (!this.view || !this.app.workspace.getLeavesOfType('markdown').some(leaf => leaf.view === this.view) ||
+                    this.view.file !== target || !this.initialCursor || this.view.editor.getValue() !== this.initialEditorText) {
                     this.recovery.buttonEl.hidden = false;
-                    throw new UserError(t('原笔记已切换或内容已变化。可改为文末追加。', 'The original note changed. You can append to the end instead.'));
+                    throw new UserError(t('原笔记已关闭、切换或内容已变化。可改为文末追加。', 'The original note was closed or changed. You can append to the end instead.'));
                 }
                 this.view.editor.replaceRange(text, this.initialCursor);
             } else await this.app.vault.process(target, content => mergeNote(content, text, action));

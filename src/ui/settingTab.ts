@@ -322,14 +322,14 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
             { name: t('默认写入方式', 'Default import mode'), desc: t('每次导入都会展示目标。替换正文始终需要确认。', 'Every import shows its destination. Replacing the body always requires confirmation.'), render: setting => {
                 const feedback = setting.descEl.createDiv({ cls: 'moonreader-preference-feedback', attr: { role: 'status', 'aria-live': 'polite' } });
                 let editRevision = 0;
-                setting.addDropdown(dropdown => dropdown.addOption('ask', t('当前笔记光标处', 'Current note cursor')).addOption('append', t('文末追加', 'Append')).setValue(this.plugin.settings.insertAction === 'overwrite' ? 'ask' : this.plugin.settings.insertAction).onChange(async value => {
+                setting.addDropdown(dropdown => dropdown.addOption('ask', t('当前笔记光标处', 'Current note cursor')).addOption('append', t('文末追加', 'Append')).setValue(this.plugin.settings.insertAction).onChange(async value => {
                     if (value !== 'ask' && value !== 'append') return;
                     const revision = ++editRevision;
                     try {
                         await this.plugin.updateSettings({ insertAction: value });
                         if (revision === editRevision) { dropdown.setValue(value); feedback.setText(t('已保存。', 'Saved.')); }
                     } catch (error) {
-                        if (revision === editRevision) { feedback.setText(errorMessage(error)); dropdown.setValue(this.plugin.settings.insertAction === 'overwrite' ? 'ask' : this.plugin.settings.insertAction); }
+                        if (revision === editRevision) { feedback.setText(errorMessage(error)); dropdown.setValue(this.plugin.settings.insertAction); }
                     }
                 }));
             } },

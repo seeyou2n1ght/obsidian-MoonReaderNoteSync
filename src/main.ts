@@ -40,7 +40,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
             bookListLimit: typeof saved.bookListLimit === 'number' && Number.isSafeInteger(saved.bookListLimit) && saved.bookListLimit >= 0 ? saved.bookListLimit : DEFAULT_SETTINGS.bookListLimit,
             bookListSort: saved.bookListSort === 'title' ? 'title' : DEFAULT_SETTINGS.bookListSort,
             bookListDirection: saved.bookListDirection === 'asc' || saved.bookListDirection === 'desc' ? saved.bookListDirection : saved.bookListSort === 'title' ? 'asc' : DEFAULT_SETTINGS.bookListDirection,
-            insertAction: saved.insertAction === 'ask' || saved.insertAction === 'append' || saved.insertAction === 'overwrite' ? saved.insertAction : DEFAULT_SETTINGS.insertAction,
+            insertAction: saved.insertAction === 'append' ? 'append' : DEFAULT_SETTINGS.insertAction,
             noteTemplate: typeof saved.noteTemplate === 'string' && saved.noteTemplate.trim() ? saved.noteTemplate : DEFAULT_SETTINGS.noteTemplate
         };
         this.registerEvent(this.app.workspace.on('active-leaf-change', leaf => {
@@ -68,16 +68,6 @@ export default class MoonReaderSyncPlugin extends Plugin {
         return this.configured() ? t('连接已保存', 'Connection saved') : this.settings.secretId ?
             t('已保存的密码不可用，请重新输入并保存', 'Saved password unavailable; re-enter and save it') :
             t('连接未配置，请输入密码并保存', 'Connection not configured; enter your password and save');
-    }
-    credentialStatus(): string {
-        const id = this.settings.secretId;
-        if (!id) return t('已保存凭据：未配置', 'Saved credential: Not configured');
-        return t('已保存凭据：', 'Saved credential: ') + id + ' · ' +
-            (this.credentialAvailable() ? t('密码可读取', 'Password readable') : t('密码不可用，请选择其他凭据或新建凭据', 'Password unavailable; select another credential or create one'));
-    }
-    credentialAvailable(): boolean {
-        try { return !!(this.settings.secretId && this.app.secretStorage.getSecret(this.settings.secretId)); }
-        catch { return false; }
     }
     suggestCredentialName(webDavUrl: string): string {
         let server = 'backup';

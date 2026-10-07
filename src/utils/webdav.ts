@@ -19,7 +19,7 @@ export function normalizeWebDavUrl(value: string): string {
 }
 export class WebDAVClient {
     private url: string;
-    constructor(url: string, private username: string, private password: string, private signal?: AbortSignal, private timeoutMs?: number) {
+    constructor(url: string, private username: string, private password: string, private signal?: AbortSignal, private timeoutMs = 30_000) {
         this.url = normalizeWebDavUrl(url);
     }
     // Test a draft without persisting credentials.
@@ -39,7 +39,7 @@ export class WebDAVClient {
         const interruption = new Promise<never>((_, reject) => {
             abort = () => reject(cancelled());
             this.signal?.addEventListener('abort', abort, { once: true });
-            if (this.timeoutMs !== undefined) timer = window.setTimeout(() => reject(new UserError(t('连接检查超时，请检查服务器后重试。', 'Connection check timed out. Check the server and retry.'))), this.timeoutMs);
+            timer = window.setTimeout(() => reject(new UserError(t('WebDAV 请求超时，请检查服务器后重试。', 'WebDAV request timed out. Check the server and retry.'))), this.timeoutMs);
         });
         try {
             // requestUrl has no abort API; stop waiting and discard its late response.

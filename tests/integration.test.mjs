@@ -178,7 +178,9 @@ test('failed connection keeps old settings; hiding the form cancels an in-flight
 test('settings disk failure leaves effective settings unchanged and allows retry', async t => {
     const h = await harness(t), dav = await server(t);
     await connected(h, dav);
-    h.plugin.settings.insertAction = 'overwrite';
+    h.plugin.loadData = async () => ({ ...h.plugin.settings, insertAction: 'overwrite' });
+    await h.plugin.onload();
+    assert.equal(h.plugin.settings.insertAction, 'ask');
     const tab = settings(h), before = JSON.stringify(h.plugin.settings);
     change(h, input(tab.containerEl, 'WebDAV folder URL'), dav.url + 'new/');
     h.state.beforeSave = async () => { throw new Error('Controlled settings failure'); };
@@ -244,7 +246,7 @@ test('no active note requires a target; stale cursor is refused with an append r
     button(stale.modalEl, 'Insert 1 notes').click();
     button(stale.modalEl, 'Import again').click();
     assert.equal(h.state.writes, 1);
-    assert.match(stale.contentEl.textContent, /original note changed/i);
+    assert.match(stale.contentEl.textContent, /original note.*changed/i);
     button(stale.modalEl, 'Use append instead').click();
     button(stale.modalEl, 'Append 1 notes').click(); button(stale.modalEl, 'Import again').click(); await until(() => h.state.writes === 2);
     assert.match(h.files.get(h.target), /Concurrent edit/);
@@ -1179,6 +1181,65 @@ test('WebDAV connection checks time out, abort without a request when already ca
     gate.resolve(); dav.state.beforeList = null;
     const files = await h.WebDAVClient.testConnection(dav.url, 'reader', 'synthetic-password');
     assert.equal(files.length, 1);
+});
+
+test('refresh listing and download timeouts retain notes, release the lock and ignore late responses after retry', async t => {
+    for (const method of ['PROPFIND', 'GET']) {
+        const h = await harness(t), dav = await server(t);
+        await connected(h, dav); await h.plugin.refresh();
+        h.plugin.cache.books[0].lastSynced = undefined;
+        const previousNotes = h.plugin.cache.books[0].notes;
+        const gate = deferred(), request = h.host.requestUrl;
+        let held = false, timedOut = false;
+        h.host.requestUrl = options => {
+            if (options.method === method && !held) { held = true; return gate.promise; }
+            return request(options);
+        };
+        const timer = h.dom.window.setTimeout.bind(h.dom.window);
+        h.dom.window.setTimeout = (callback, delay, ...args) => {
+            assert.equal(delay, 30_000);
+            return timer(() => { timedOut = true; callback(...args); }, 80);
+        };
+        const pending = h.plugin.refresh();
+        await until(() => held);
+        await h.plugin.refresh();
+        assert.equal(h.plugin.syncing, true);
+        await until(() => !h.plugin.syncing);
+        await pending;
+        assert.equal(timedOut, true);
+        assert.equal(h.plugin.syncing, false);
+        assert.deepEqual(h.plugin.cache.books[0].notes, previousNotes);
+        assert.match(h.plugin.status, method === 'PROPFIND' ? /timed out/ : /1 failed/);
+        h.dom.window.setTimeout = timer;
+        await h.plugin.refresh();
+        assert.match(h.plugin.status, /Refresh complete: 1 updated/);
+        const committed = h.plugin.cache, status = h.plugin.status;
+        const cacheFile = (await fs.readdir(join(h.vault, h.dir))).find(f => /^moonreader_cache\.[a-f0-9]+\.json$/.test(f));
+        const disk = await fs.readFile(join(h.vault, h.dir, cacheFile), 'utf8');
+        gate.resolve({ status: 207, text: xml(''), arrayBuffer: new ArrayBuffer(0) });
+        await new Promise(resolve => setTimeout(resolve, 10));
+        assert.equal(h.plugin.cache, committed);
+        assert.equal(h.plugin.status, status);
+        assert.equal(await fs.readFile(join(h.vault, h.dir, cacheFile), 'utf8'), disk);
+    }
+});
+
+test('closing the captured Markdown view refuses cursor insertion and allows explicit append recovery', async t => {
+    const h = await harness(t), modal = openImport(h), before = h.files.get(h.target);
+    h.app.workspace.getLeavesOfType = () => [];
+    button(modal.contentEl, 'Insert 1 notes').click();
+    await until(() => !modal.panel.busy);
+    assert.equal(h.state.writes, 0);
+    assert.equal(h.files.get(h.target), before);
+    assert.equal(h.plugin.sessionImports.size, 0);
+    assert.equal(modal.panel.completed, false);
+    assert.match(modal.contentEl.querySelector('.moonreader-import-feedback .moonreader-status').textContent, /closed/);
+    button(modal.contentEl, 'Use append instead').click();
+    button(modal.contentEl, 'Append 1 notes').click();
+    await until(() => h.state.writes === 1);
+    assert.ok(h.files.get(h.target).startsWith(before));
+    assert.ok(h.files.get(h.target).includes('Highlight'));
+    assert.equal(h.plugin.sessionImports.size, 1);
 });
 
 

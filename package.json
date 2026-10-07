@@ -1,6 +1,6 @@
 {
   "name": "ob-moonreadernotesync",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Import Moon+ Reader highlights and annotations from WebDAV backups into your notes.",
   "private": true,
   "main": "main.js",
