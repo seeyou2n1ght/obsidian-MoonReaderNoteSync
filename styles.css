@@ -38,6 +38,43 @@
 .moonreader-destination .moonreader-meta { margin-top: 3px; }
 .moonreader-destination > div:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .moonreader-status { line-height: 1.5; overflow-wrap: anywhere; }
+.moonreader-connection-group { container: moonreader-connection / inline-size; }
+.moonreader-connection-card { display: grid; grid-template-columns: minmax(0, 2fr) minmax(160px, 1fr); gap: 18px; padding: 18px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); }
+@container moonreader-connection (max-width: 520px) { .moonreader-connection-card { grid-template-columns: minmax(0, 1fr); } }
+.moonreader-settings .moonreader-connection-card > .setting-item:not(.setting-item-heading) { border: 0; padding: 0; margin: 0; }
+.moonreader-connection-field { flex-direction: column; align-items: stretch; gap: 8px; }
+.moonreader-connection-field .setting-item-info { flex: 1; min-width: 0; margin-right: 0; }
+.moonreader-connection-field .setting-item-control { width: 100%; flex: 0 0 auto; }
+.moonreader-connection-card .moonreader-connection-field input[type="text"] { width: 100%; }
+.moonreader-connection-card .moonreader-keychain, .moonreader-connection-card .moonreader-connection-actions { grid-column: 1 / -1; }
+.moonreader-connection-card .moonreader-credential-controls { padding: 0; border: 0; border-radius: 0; }
+.moonreader-settings .moonreader-connection-card > .setting-item.moonreader-keychain { padding-top: 16px; border-top: 1px solid var(--background-modifier-border); }
+.moonreader-settings .moonreader-connection-card > .setting-item.moonreader-connection-actions { padding-top: 14px; border-top: 1px solid var(--background-modifier-border); }
+.moonreader-connection-card .moonreader-connection-actions .setting-item-info { display: none; }
+.moonreader-connection-card .moonreader-connection-actions .setting-item-control { width: 100%; gap: 8px; justify-content: flex-end; }
+.moonreader-connection-card .moonreader-connection-actions .moonreader-status { order: -1; text-align: left; margin: 0 0 4px; }
+.moonreader-connection-card .moonreader-status[data-state="dirty"] { color: var(--text-warning); }
+.moonreader-connection-card .moonreader-status[data-state="error"] { color: var(--text-error); }
+.moonreader-preference-feedback { margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-small); }
+.moonreader-preference-feedback:empty { display: none; }
+.moonreader-back-to-library .setting-item-info { display: none; }
+.moonreader-keychain { flex-direction: column; align-items: stretch; gap: 12px; }
+.moonreader-keychain .setting-item-control { width: 100%; justify-content: flex-start; }
+.moonreader-credential-controls { display: flex; flex-direction: column; gap: 12px; min-width: 0; width: 100%; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); text-align: left; }
+.moonreader-credential { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.moonreader-credential-heading { display: flex; align-items: center; gap: 10px; font-size: var(--font-ui-small); }
+.moonreader-credential-name { overflow-wrap: anywhere; white-space: normal; font-size: var(--font-ui-smaller); }
+.moonreader-existing-credential { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.moonreader-new-password { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.moonreader-existing-credential select { width: 100%; min-width: min(100%, 220px); max-width: 100%; }
+.moonreader-new-password label { display: flex; flex-direction: column; gap: 6px; font-size: var(--font-ui-small); width: 100%; }
+.moonreader-new-password input { width: 100%; }
+.moonreader-connection-card .moonreader-new-password input[type="text"], .moonreader-connection-card .moonreader-new-password input[type="password"] { width: 100%; }
+.moonreader-credential-help { color: var(--text-muted); font-size: var(--font-ui-smaller); text-align: left; }
+.moonreader-credential-name-error { color: var(--text-error); font-size: var(--font-ui-small); text-align: left; }
+.moonreader-credential-name-error:empty { display: none; }
+.moonreader-new-password input[aria-invalid="true"] { border-color: var(--text-error); }
+.moonreader-settings [hidden] { display: none; }
 .moonreader-import-feedback { display: flex; align-items: center; gap: 8px; }
 .moonreader-import-feedback .moonreader-status { flex: 1; font-size: var(--font-ui-small); }
 .moonreader-import-feedback .moonreader-status:empty { display: none; }
@@ -54,11 +91,12 @@
 .moonreader-connection-actions .setting-item-control { flex-wrap: wrap; }
 .moonreader-connection-actions .moonreader-status { flex-basis: 100%; text-align: right; }
 .moonreader-template-setting { flex-direction: column; align-items: stretch; }
-.moonreader-template-setting .setting-item-control { display: block; }
+.moonreader-template-setting .setting-item-control { display: block; text-align: left; }
 .moonreader-connection { width: min(760px, 94vw); }
 .moonreader-settings .moonreader-status { font-size: var(--font-ui-small); color: var(--text-muted); margin: 12px 0; }
-.moonreader-settings-template { margin-top: 24px; }
+.moonreader-settings-template { margin-top: 8px; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
 .moonreader-settings-template[open] summary { margin-bottom: 16px; }
+.moonreader-settings-template > button { display: block; margin-left: auto; }
 .moonreader-settings summary, .moonreader-library summary { cursor: pointer; }
 @media (max-width: 650px) {
     .moonreader-workspace { grid-template-columns: 1fr; grid-template-rows: 190px minmax(0, 1fr); height: 54vh; min-height: 250px; }
@@ -73,3 +111,11 @@
     .moonreader-settings .setting-item-control { justify-content: flex-start; }
     .moonreader-settings input[type="text"], .moonreader-settings input[type="password"] { width: 100%; }
 }
+
+.moonreader-saved-label { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: min(100%, 220px); font-size: var(--font-ui-small); }
+.moonreader-selection-hint { flex-basis: 100%; color: var(--text-muted); font-size: var(--font-ui-small); }
+.moonreader-selection-hint[data-empty="true"] { flex-basis: auto; order: -1; }
+.moonreader-credential-warning { color: var(--text-warning); font-size: var(--font-ui-small); }
+.moonreader-test-action { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.moonreader-test-hint { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.moonreader-connection-card .moonreader-connection-actions .setting-item-control { align-items: flex-start; }

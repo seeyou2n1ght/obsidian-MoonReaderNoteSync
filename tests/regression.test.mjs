@@ -13,7 +13,10 @@ class FileSystemAdapter {
     async exists(path) { try { await fs.stat(join(this.base, path)); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } }
     read(path) { return fs.readFile(join(this.base, path), 'utf8'); }
     write(path, text) { return fs.writeFile(join(this.base, path), text); }
-    rename(path, next) { return fs.rename(join(this.base, path), join(this.base, next)); }
+    async rename(path, next) {
+        if (await this.exists(next)) throw new Error('Destination file already exists!');
+        return fs.rename(join(this.base, path), join(this.base, next));
+    }
     remove(path) { return fs.unlink(join(this.base, path)); }
 }
 const obsidian = {
@@ -103,7 +106,7 @@ test('partial refresh retains failed book, updates good book and reports new fai
 test('directory errors propagate without providing a replacement cache', async () => {
     await assert.rejects(syncBooks({ getFiles: async () => { throw new Error('403'); }, getFileBuffer: async () => compressed() }, [book], () => {}));
 });
-test('cache atomically replaces JSON, scopes accounts and migrates legacy records', async () => {
+test('cache replaces JSON with a non-overwriting adapter, scopes accounts and migrates legacy records', async () => {
     const path = join(root, 'cache.json');
     const source = sourceId('https://example.test/dav/', 'reader');
     const cache = { version: 1, source, checkedAt: '2026-01-01T00:00:00Z', books: [book] };
@@ -151,6 +154,42 @@ test('WebDAV URLs preserve encoded path characters and reject cross-origin downl
     assert.throws(() => normalizeWebDavUrl('file:///tmp/'));
     const client = new WebDAVClient('https://example.test/dav/', 'reader', 'test-password');
     await assert.rejects(client.getFileBuffer('https://other.test/file.an'), /another site/);
+});
+test('cache promotion failure rolls back; an interrupted rollback recovers on the next read', async () => {
+    for (const failRollback of [false, true]) {
+        const storage = new FileSystemAdapter(root), path = `rollback-${failRollback}.json`;
+        const original = { version: 1, source: 'a', checkedAt: '', books: [book] };
+        await writeVaultCache(storage, path, original);
+        const failed = Object.create(storage);
+        failed.rename = async (from, to) => {
+            if (from.endsWith('.tmp') || (failRollback && from.endsWith('.bak'))) throw new Error('Promotion failure');
+            return storage.rename(from, to);
+        };
+        await assert.rejects(writeVaultCache(failed, path, { ...original, books: [] }), /Promotion failure/);
+        assert.equal(await storage.exists(path + '.bak'), failRollback);
+        assert.deepEqual(await readVaultCache(storage, path, 'a', 'https://example.test/dav/'), original);
+        assert.equal(await storage.exists(path + '.bak'), false);
+    }
+});
+test('committed cache survives failed backup cleanup and concurrent reads and writes stay ordered', async () => {
+    const storage = new FileSystemAdapter(root), path = 'ordered-cache.json';
+    const original = { version: 1, source: 'a', checkedAt: '', books: [book] };
+    await writeVaultCache(storage, path, original);
+    const failed = Object.create(storage);
+    failed.remove = async name => { if (name.endsWith('.bak')) throw new Error('Cleanup failure'); return storage.remove(name); };
+    const next = { ...original, books: [] };
+    await writeVaultCache(failed, path, next);
+    assert.deepEqual(await readVaultCache(failed, path, 'a', 'https://example.test/dav/'), next);
+    assert.deepEqual(await readVaultCache(storage, path, 'a', 'https://example.test/dav/'), next);
+    const operations = await Promise.all([
+        writeVaultCache(storage, path, original),
+        readVaultCache(storage, path, 'a', 'https://example.test/dav/'),
+        writeVaultCache(storage, path, next),
+        readVaultCache(storage, path, 'a', 'https://example.test/dav/')
+    ]);
+    assert.deepEqual(operations[1], original);
+    assert.deepEqual(operations[3], next);
+    assert.equal(await storage.exists(path + '.bak'), false);
 });
 test('settings saves serialize, and a failed save does not change effective settings', async () => {
     const plugin = new Plugin();

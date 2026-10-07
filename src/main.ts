@@ -14,9 +14,13 @@ export default class MoonReaderSyncPlugin extends Plugin {
     cache: BookCache = { version: 1, source: '', checkedAt: '', books: [] };
     syncing = false;
     connectionSaving = false;
+    connectionOperation: 'test' | 'save' | null = null;
+    private connectionToken: symbol | null = null;
+    private blockedRefresh: { previous: string; message: string } | null = null;
     status = '';
     readonly listeners = new Set<() => void>();
     readonly sessionImports = new Set<string>();
+    private readonly clearedCredentialNames = new Set<string>();
     private recentMarkdownView: MarkdownView | null = null;
     private saves: Promise<void> = Promise.resolve();
     private settingsTab!: MoonReaderWebDAVSettingTab;
@@ -65,26 +69,92 @@ export default class MoonReaderSyncPlugin extends Plugin {
             t('已保存的密码不可用，请重新输入并保存', 'Saved password unavailable; re-enter and save it') :
             t('连接未配置，请输入密码并保存', 'Connection not configured; enter your password and save');
     }
-    async saveConnection(webDavUrl: string, username: string, password: string, isActive: () => boolean) {
-        if (!isActive()) return;
-        if (this.settings.secretId && username === this.settings.username &&
+    credentialStatus(): string {
+        const id = this.settings.secretId;
+        if (!id) return t('已保存凭据：未配置', 'Saved credential: Not configured');
+        return t('已保存凭据：', 'Saved credential: ') + id + ' · ' +
+            (this.credentialAvailable() ? t('密码可读取', 'Password readable') : t('密码不可用，请选择其他凭据或新建凭据', 'Password unavailable; select another credential or create one'));
+    }
+    credentialAvailable(): boolean {
+        try { return !!(this.settings.secretId && this.app.secretStorage.getSecret(this.settings.secretId)); }
+        catch { return false; }
+    }
+    suggestCredentialName(webDavUrl: string): string {
+        let server = 'backup';
+        try { server = new URL(webDavUrl).hostname.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40).replace(/^-+|-+$/g, '') || server; } catch { /* allow editing an incomplete URL */ }
+        const existing = new Set(this.app.secretStorage.listSecrets());
+        let id: string;
+        do { id = 'moonreader-' + server + '-' + randomUUID().slice(0, 8); } while (existing.has(id));
+        return id;
+    }
+    validateNewCredentialName(value: string): string {
+        const id = value.trim();
+        if (!id) throw new UserError(t('请填写凭据名称。', 'Enter a credential name.'));
+        if (!/^[a-z0-9-]+$/.test(id) || id.length > 64) throw new UserError(t('名称仅支持小写字母、数字和连字符，最多 64 个字符。', 'Use lowercase letters, numbers and dashes, up to 64 characters.'));
+        const retryingClearedEntry = this.clearedCredentialNames.has(id) && !this.app.secretStorage.getSecret(id);
+        if (this.app.secretStorage.listSecrets().includes(id) && !retryingClearedEntry) throw new UserError(t('名称已存在。请选择已有凭据，或使用其他名称。', 'This name already exists. Choose the existing credential or use another name.'));
+        return id;
+    }
+    beginConnectionOperation(save: boolean): symbol | null {
+        if (this.connectionSaving || this.disposed) return null;
+        const token = this.connectionToken = Symbol('connection');
+        this.connectionSaving = true; this.connectionOperation = save ? 'save' : 'test'; this.notify();
+        return token;
+    }
+    endConnectionOperation(token: symbol) {
+        if (this.connectionToken !== token) return;
+        this.connectionToken = null; this.connectionSaving = false; this.connectionOperation = null;
+        if (this.blockedRefresh) {
+            if (this.status === this.blockedRefresh.message) this.status = this.blockedRefresh.previous;
+            this.blockedRefresh = null;
+        }
+        this.notify();
+    }
+    async saveConnection(webDavUrl: string, username: string, password: string, isActive: () => boolean, existingSecretId?: string, newCredentialName?: string, onCommit?: () => void) {
+        const canCommit = () => !this.disposed && isActive();
+        if (!canCommit()) return false;
+        const verifyCredential = (id: string) => {
+            if (!canCommit()) return false;
+            if (this.app.secretStorage.getSecret(id) !== password) {
+                throw new UserError(t('所选凭据已更改或不可用，请重新测试后保存。', 'The selected credential changed or is unavailable. Test again before saving.'));
+            }
+            onCommit?.(); return true;
+        };
+        if (existingSecretId) {
+            if (this.app.secretStorage.getSecret(existingSecretId) !== password) {
+                throw new UserError(t('所选凭据已更改或不可用，请重新测试后保存。', 'The selected credential changed or is unavailable. Test again before saving.'));
+            }
+            if (!await this.updateSettings({ webDavUrl, username, secretId: existingSecretId }, () => verifyCredential(existingSecretId))) return false;
+            await this.loadCache(); return true;
+        }
+        if (newCredentialName === undefined && this.settings.secretId && username === this.settings.username &&
             new URL(webDavUrl).origin === new URL(this.settings.webDavUrl).origin &&
             this.app.secretStorage.getSecret(this.settings.secretId) === password) {
-            await this.updateSettings({ webDavUrl, username });
-            this.notify(); return;
+            if (!await this.updateSettings({ webDavUrl, username }, () => verifyCredential(this.settings.secretId))) return false;
+            await this.loadCache(); return true;
         }
-        const secretId = 'moonreader-' + randomUUID();
+        const secretId = this.validateNewCredentialName(newCredentialName ?? this.suggestCredentialName(webDavUrl));
+        const clearCreatedCredential = () => {
+            // Do not clear another writer's replacement while settings were being saved.
+            if (this.app.secretStorage.getSecret(secretId) === password) {
+                this.app.secretStorage.setSecret(secretId, '');
+                this.clearedCredentialNames.add(secretId);
+            }
+        };
         try {
             this.app.secretStorage.setSecret(secretId, password);
             if (this.app.secretStorage.getSecret(secretId) !== password) throw new Error('Secret storage did not retain the credential');
-            if (!isActive()) { this.app.secretStorage.setSecret(secretId, ''); return; }
-            await this.updateSettings({ webDavUrl, username, secretId });
+            this.clearedCredentialNames.delete(secretId);
+            if (!await this.updateSettings({ webDavUrl, username, secretId }, () => verifyCredential(secretId))) {
+                clearCreatedCredential(); return false;
+            }
         } catch (error) {
-            try { this.app.secretStorage.setSecret(secretId, ''); }
-            catch { throw new UserError(t('连接未更改，但新凭据清理失败。可在 Obsidian 密钥库中清理未使用的 moonreader 凭据。', 'Connection unchanged, but the unused credential could not be cleared. Manage unused moonreader entries in Obsidian Keychain.')); }
+            try { clearCreatedCredential(); }
+            catch { throw new UserError(t('连接未更改，但新凭据清理失败。可在 Obsidian 密钥库中清理未使用的凭据。', 'Connection unchanged, but the unused credential could not be cleared. Manage unused entries in Obsidian Keychain.')); }
             throw error;
         }
-        this.notify();
+        // A committed connection must switch caches even if its form has closed.
+        await this.loadCache(); return true;
     }
     private currentSource(): string {
         return sourceId(normalizeWebDavUrl(this.settings.webDavUrl), this.settings.username);
@@ -112,14 +182,16 @@ export default class MoonReaderSyncPlugin extends Plugin {
         }
         this.notify();
     }
-    async updateSettings(patch: Partial<MoonReaderSyncSettings>): Promise<void> {
+    async updateSettings(patch: Partial<MoonReaderSyncSettings>, shouldSave: () => boolean = () => true): Promise<boolean> {
         const save = this.saves.then(async () => {
+            if (!shouldSave()) return false;
             const next = { ...this.settings, ...patch };
             await this.saveData(next);
             this.settings = next;
+            return true;
         });
-        this.saves = save.catch(() => {});
-        await save;
+        this.saves = save.then(() => {}, () => {});
+        return save;
     }
     notify() { if (!this.disposed) this.listeners.forEach(fn => fn()); }
     openLibrary(refreshIfEmpty = true) {
@@ -155,7 +227,10 @@ export default class MoonReaderSyncPlugin extends Plugin {
     async refresh() {
         if (this.syncing) return;
         if (this.connectionSaving) {
-            this.status = t('正在保存连接，请稍后刷新。', 'Connection is being saved. Refresh when it finishes.');
+            const message = this.connectionOperation === 'test' ? t('正在测试连接，请完成或取消检查后刷新。', 'Connection is being tested. Finish or cancel the check before refreshing.') :
+                t('正在保存连接，请稍后刷新。', 'Connection is being saved. Refresh when it finishes.');
+            this.blockedRefresh = { previous: this.blockedRefresh?.previous ?? this.status, message };
+            this.status = message;
             this.notify();
             return;
         }
@@ -179,7 +254,11 @@ export default class MoonReaderSyncPlugin extends Plugin {
                 }, () => this.disposed);
             if (this.disposed || source !== this.currentSource()) return;
             const next: BookCache = { version: 1, source, checkedAt: result.checkedAt, books: result.books };
-            await writeCache(this.app.vault.adapter, this.cachePath(source), next);
+            try {
+                await writeCache(this.app.vault.adapter, this.cachePath(source), next);
+            } catch {
+                throw new UserError(t('远端检查已完成，但本地缓存保存失败。请检查插件目录的访问权限后重试。', 'Remote check completed, but saving the local cache failed. Check access to the plugin folder and retry.'));
+            }
             this.cache = next;
             this.status = t('刷新完成', 'Refresh complete') + ': ' + result.updated + t(' 本更新，', ' updated, ') +
                 result.unchanged + t(' 本未变化，', ' unchanged, ') + result.failed + t(' 本失败。', ' failed.');

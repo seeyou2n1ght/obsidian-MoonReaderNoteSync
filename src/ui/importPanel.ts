@@ -80,13 +80,15 @@ export class ImportPanel extends Component {
         });
         this.setBook(null);
     }
-    setBook(book: BookItem | null) {
+    setBook(book: BookItem | null, preserveFeedback = false) {
         if (this.busy) return;
         const sameBook = this.book === book;
         this.book = book;
         if (!sameBook) {
             if (this.action === 'overwrite') this.action = 'append';
-            this.clearFeedback(); this.confirmation.empty(); this.confirmation.hidden = true; this.repeatConfirmation = false;
+            if (!preserveFeedback) this.clearFeedback();
+            this.recovery.buttonEl.hidden = true;
+            this.confirmation.empty(); this.confirmation.hidden = true; this.repeatConfirmation = false;
         }
         this.heading.setText(book?.bookName || t('阅读笔记', 'Reading notes'));
         this.meta.setText(book ? book.notes.length + t(' 条笔记 · 预览前 3 条', ' notes · Preview of the first 3') : t('选择一本书以预览笔记。', 'Choose a book to preview its notes.'));
@@ -172,6 +174,7 @@ export class ImportPanel extends Component {
             this.updateButton(); return;
         }
         const target = this.target, action = this.action, book = this.book;
+        const importKey = this.importKey();
         this.busy = true; this.changed(); this.updateButton(); this.recovery.buttonEl.hidden = true;
         this.status.setText(t('正在写入…', 'Writing…'));
         this.footer.querySelectorAll<HTMLButtonElement>('button').forEach(el => el.disabled = true);
@@ -188,7 +191,7 @@ export class ImportPanel extends Component {
                 this.view.editor.replaceRange(text, this.initialCursor);
             } else await this.app.vault.process(target, content => mergeNote(content, text, action));
             this.completed = true;
-            this.plugin.sessionImports.add(this.importKey());
+            this.plugin.sessionImports.add(importKey);
             new Notice(book.notes.length + t(' 条笔记已写入 ', ' notes written to ') + target.path);
         } catch (error) { if (this.active) this.status.setText(errorMessage(error)); }
         finally {

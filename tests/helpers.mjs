@@ -31,7 +31,10 @@ export async function harness(t) {
         async exists(path) { try { await fs.stat(join(this.base, path)); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } }
         read(path) { return fs.readFile(join(this.base, path), 'utf8'); }
         write(path, text) { return fs.writeFile(join(this.base, path), text); }
-        rename(path, next) { return fs.rename(join(this.base, path), join(this.base, next)); }
+        async rename(path, next) {
+            if (await this.exists(next)) throw new Error('Destination file already exists!');
+            return fs.rename(join(this.base, path), join(this.base, next));
+        }
         remove(path) { return fs.unlink(join(this.base, path)); }
     }
     const host = { ...evaluate(hostCode.outputFiles[0].text, dom.window), FileSystemAdapter, Plugin: class {
@@ -52,6 +55,7 @@ export async function harness(t) {
     const secrets = new Map();
     const secretState = { writes: 0, failWrite: false, unavailable: false };
     const app = { secretStorage: {
+        listSecrets: () => [...secrets.keys()],
         getSecret: id => { if (secretState.unavailable) throw new Error('Controlled keychain failure'); return secrets.get(id) ?? null; },
         setSecret: (id, value) => { if (secretState.failWrite) throw new Error('Controlled keychain write failure'); secrets.set(id, value); secretState.writes++; }
     }, vault: {

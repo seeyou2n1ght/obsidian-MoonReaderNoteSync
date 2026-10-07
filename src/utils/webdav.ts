@@ -19,12 +19,12 @@ export function normalizeWebDavUrl(value: string): string {
 }
 export class WebDAVClient {
     private url: string;
-    constructor(url: string, private username: string, private password: string) {
+    constructor(url: string, private username: string, private password: string, private signal?: AbortSignal, private timeoutMs?: number) {
         this.url = normalizeWebDavUrl(url);
     }
     // Test a draft without persisting credentials.
-    static testConnection(url: string, username: string, password: string): Promise<WebDAVFile[]> {
-        return new WebDAVClient(url, username, password).getFiles();
+    static testConnection(url: string, username: string, password: string, signal?: AbortSignal, timeoutMs = 30_000): Promise<WebDAVFile[]> {
+        return new WebDAVClient(url, username, password, signal, timeoutMs).getFiles();
     }
     private async request(url: string, method: string) {
         if (new URL(url).origin !== new URL(this.url).origin) {
@@ -32,12 +32,27 @@ export class WebDAVClient {
         }
         const password = this.password;
         if (!password) throw new UserError(t('请填写 WebDAV 密码。', 'Enter your WebDAV password.'));
-        const response = await requestUrl({ url, method, throw: false, headers: {
-            Authorization: 'Basic ' + Buffer.from(this.username + ':' + password).toString('base64'),
-            ...(method === 'PROPFIND' ? { Depth: '1' } : {})
-        } });
-        if (response.status < 200 || response.status >= 300) throw Object.assign(new Error('WebDAV request failed'), { status: response.status });
-        return response;
+        const cancelled = () => new UserError(t('连接检查已取消。', 'Connection check cancelled.'));
+        if (this.signal?.aborted) throw cancelled();
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let abort: (() => void) | undefined;
+        const interruption = new Promise<never>((_, reject) => {
+            abort = () => reject(cancelled());
+            this.signal?.addEventListener('abort', abort, { once: true });
+            if (this.timeoutMs !== undefined) timer = setTimeout(() => reject(new UserError(t('连接检查超时，请检查服务器后重试。', 'Connection check timed out. Check the server and retry.'))), this.timeoutMs);
+        });
+        try {
+            // requestUrl has no abort API; stop waiting and discard its late response.
+            const response = await Promise.race([requestUrl({ url, method, throw: false, headers: {
+                Authorization: 'Basic ' + Buffer.from(this.username + ':' + password).toString('base64'),
+                ...(method === 'PROPFIND' ? { Depth: '1' } : {})
+            } }), interruption]);
+            if (response.status < 200 || response.status >= 300) throw Object.assign(new Error('WebDAV request failed'), { status: response.status });
+            return response;
+        } finally {
+            if (timer !== undefined) clearTimeout(timer);
+            if (abort) this.signal?.removeEventListener('abort', abort);
+        }
     }
     async getFiles(): Promise<WebDAVFile[]> {
         const response = await this.request(this.url, 'PROPFIND');

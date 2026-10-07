@@ -22,6 +22,7 @@ export class BookSuggestModal extends Modal {
     private selected: string | null = null;
     private shownBooks: BookItem[] = [];
     private unsubscribe = () => {};
+    private updateLibrary = () => {};
     private closeRequested = false;
     private disposed = false;
     constructor(app: App, private plugin: MoonReaderSyncPlugin, private view: MarkdownView | null, private closed: () => void) {
@@ -50,6 +51,7 @@ export class BookSuggestModal extends Modal {
         const footer = this.contentEl.createDiv({ cls: 'moonreader-footer' });
         this.panel = this.owner.addChild(new ImportPanel(this.app, this.plugin, this.reading, footer, this.view, () => this.close(), () => {
             this.updateBusy();
+            if (!this.panel.busy) this.updateLibrary();
             if (this.closeRequested && !this.panel.busy) this.close();
         }));
         this.inputEl.addEventListener('input', () => { if (!this.panel.busy) this.renderBooks(); });
@@ -70,14 +72,14 @@ export class BookSuggestModal extends Modal {
         let limit = this.plugin.settings.bookListLimit;
         let sort = this.plugin.settings.bookListSort;
         let direction = this.plugin.settings.bookListDirection;
-        const update = () => {
+        const update = this.updateLibrary = () => {
             this.status.setText(this.plugin.status);
             this.connectionStatus.setText(this.plugin.connectionStatus());
             this.connectionStatus.hidden = this.plugin.configured();
             this.updateOrderButton();
-            this.refreshButton.setDisabled(this.plugin.syncing || this.panel.busy);
+            this.refreshButton.setDisabled(this.plugin.syncing || this.plugin.connectionSaving || this.panel.busy);
             if (!this.panel.busy && (books !== this.plugin.cache.books || limit !== this.plugin.settings.bookListLimit || sort !== this.plugin.settings.bookListSort || direction !== this.plugin.settings.bookListDirection)) {
-                books = this.plugin.cache.books; limit = this.plugin.settings.bookListLimit; sort = this.plugin.settings.bookListSort; direction = this.plugin.settings.bookListDirection; this.renderBooks();
+                books = this.plugin.cache.books; limit = this.plugin.settings.bookListLimit; sort = this.plugin.settings.bookListSort; direction = this.plugin.settings.bookListDirection; this.renderBooks(true);
             }
         };
         this.plugin.listeners.add(update);
@@ -111,7 +113,7 @@ export class BookSuggestModal extends Modal {
         }
         const rect = this.bookOrder.buttonEl.getBoundingClientRect(); menu.showAtPosition({ x: rect.left, y: rect.bottom });
     }
-    private renderBooks() {
+    private renderBooks(preserveFeedback = false) {
         if (this.panel.busy || this.disposed) return;
         const query = this.inputEl.value.trim().toLocaleLowerCase();
         const matched = this.plugin.cache.books.filter(book => book.bookName.toLocaleLowerCase().includes(query));
@@ -146,7 +148,7 @@ export class BookSuggestModal extends Modal {
         if (book) this.inputEl.setAttribute('aria-activedescendant', 'moonreader-book-' + this.shownBooks.indexOf(book));
         else this.inputEl.removeAttribute('aria-activedescendant');
         if (restoreListFocus) this.list.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus();
-        this.panel.setBook(book);
+        this.panel.setBook(book, preserveFeedback);
         this.reading.hidden = !book;
         this.empty.hidden = !!book;
         this.empty.empty();
@@ -170,9 +172,9 @@ export class BookSuggestModal extends Modal {
         this.bookOrder.setDisabled(this.panel.busy || this.savingOrder);
         if (this.panel.busy) this.orderMenu?.hide();
         this.list.querySelectorAll<HTMLButtonElement>('button').forEach(el => el.disabled = this.panel.busy);
-        this.refreshButton.setDisabled(this.panel.busy || this.plugin.syncing);
+        this.refreshButton.setDisabled(this.panel.busy || this.plugin.syncing || this.plugin.connectionSaving);
         this.settingsButton.setDisabled(this.panel.busy);
     }
     close() { if (this.panel?.busy) { this.closeRequested = true; return; } super.close(); }
-    onClose() { this.disposed = true; this.orderMenu?.hide(); this.unsubscribe(); this.owner.unload(); this.contentEl.empty(); this.closed(); }
+    onClose() { this.disposed = true; this.orderMenu?.hide(); this.unsubscribe(); this.updateLibrary = () => {}; this.owner.unload(); this.contentEl.empty(); this.closed(); }
 }

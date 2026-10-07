@@ -18,16 +18,26 @@ GitHub's automatically generated source archives do not contain the built plugin
 
 First, back up your reading annotations to WebDAV from Moon+ Reader. Check that the backup folder contains `.an` files.
 
-1. Open the plugin settings and enter the WebDAV folder URL, username, and password or app password.
+1. Open the plugin settings and enter the WebDAV folder URL and username. Select an existing credential, or use **New Keychain** to enter a name and password or app password.
 2. Optionally select **Test connection** to check folder access. Testing does not save settings.
-3. Select **Save connection**. After validation, the password is stored in Obsidian Keychain.
+3. Select **Verify and save connection**, or **Create Keychain and save connection** when creating an entry. After validation, the connection is saved; a new entry is stored in Obsidian Keychain.
 4. Open the library from the ribbon button or the **Browse and import notes** command. Books are fetched automatically if there is no cache. Use the refresh button for later updates.
 
 If setup is incomplete, refreshing shows an explanation. The library's settings button opens the connection form; import preferences and the default template are available in the full plugin settings.
 
+The settings page has four sections: **Backup connection**, **Library display**, **Note insertion**, and **Note template**. The connection card groups the folder URL, account and credential with one test/save footer; editing does not change the active connection until you save. The URL and account stack on narrow panels. Display and insertion preferences save immediately, while template edits use **Save default template**. Each section reports its own result without replacing connection feedback.
+
+The **Connection credential** panel labels its dropdown **Saved Keychains** and displays names only. The saved name appears separately only while switching entries or creating a new one. Unavailable passwords show an actionable warning. The **New Keychain** form includes an editable **Keychain name**, prefilled as `moonreader-<server-host-label>-<8-random-hex-digits>`. You can use a memorable name such as `moonreader-home-nas`. Names support lowercase letters, numbers and dashes, up to 64 characters. A duplicate name is rejected before testing and checked again before saving; choose the existing entry or use another name. Existing UUID names remain unchanged. Selecting a saved credential keeps its name; entering a new password with a new name creates that exact entry, even when the password is unchanged; old entries remain for manual management in Obsidian Keychain. Testing does not save credentials.
+
+Under **Connection credential**, the dropdown only selects existing Keychain entries; it cannot create, edit or delete them. **Currently using** appears only when the draft differs from the saved connection. Healthy entries have no availability badge. Use **New Keychain** to enter a name and password. The single primary button changes to **Create Keychain and save connection** in this mode, and **Verify and save connection** when using an existing entry. Both actions validate the server before applying changes. **Test connection** never creates a credential or changes the saved connection. **Cancel creation** clears the name and password inputs and restores the previous selection. A successful save clears and hides the form; a failed save preserves the draft for retry. When changing accounts or servers, explicitly select a credential or create one. Closing the connection form discards the draft. Manage or rename existing entries separately in Obsidian Keychain.
+
 ### Upgrading from an older version
 
 Version 0.2.0 no longer uses a separate key file or migrates old passwords. Re-enter your password once and save the connection. The server URL, username, template, and cache can be retained. Old key files are not deleted automatically.
+
+The dropdown contains named saved Keychains only, with no placeholder option. First-time configuration requires an explicit choice, indicated outside the list; it never automatically binds the first entry. With no saved entries, the list is hidden and **No saved Keychains yet** appears beside the creation action. An empty selection reports an explanation without sending a request.
+
+Changing the username or server clears the credential selection; explicitly choose a saved Keychain, even if there is only one. Reverting to the saved identity restores its credential. Connection checks have a 30-second timeout and a **Cancel check** action. Closing settings clears drafts and cancels checks or saves still waiting to commit. Once writing has started, the save finishes and switches the library cache even if the form closes. Obsidian cannot abort the underlying request; cancelled or timed-out responses are ignored.
 
 ## Import notes
 
@@ -75,11 +85,11 @@ Templates support Markdown and HTML. Field values are HTML-escaped. Preview and 
 
 The plugin connects to the WebDAV service you configure, using that service's account to read the backup directory and `.an` files. It has no telemetry, advertisements, or additional network services.
 
-Obsidian Keychain manages passwords locally; the plugin configuration stores only a credential name. Configure the password again on another device. Leave the password field blank to keep an existing password; changing the account or server requires re-entering it. Password updates do not overwrite old credentials. Unused entries can be managed in Obsidian Keychain.
+Obsidian Keychain manages passwords locally; the plugin configuration stores only a credential name. Configure the password again on another device. Select the current credential to keep using it; changing the account or server requires explicitly selecting a credential or entering a new password. Password updates do not overwrite old credentials. Unused entries can be managed in Obsidian Keychain.
 
 Book caches are stored as plain text in the plugin folder, separately for each server directory and account. The plugin does not require access to files outside the vault.
 
-The cache uses the Obsidian vault adapter for temporary writes and replacement inside the plugin folder; it does not access the system filesystem directly. The destination picker lists Markdown file paths through Obsidian's vault API without reading all note contents. The plugin does not store data in localStorage or sessionStorage.
+The cache uses the Obsidian vault adapter for temporary writes and replacement inside the plugin folder; it does not access the system filesystem directly. Replacement moves the previous cache to a `.bak` file before promoting the temporary file, since the adapter does not overwrite rename destinations. Failed promotion rolls back; an interrupted replacement recovers the backup on the next cache read or write. Cache operations for the same adapter and path are serialized. The destination picker lists Markdown file paths through Obsidian's vault API without reading all note contents. The plugin does not store data in localStorage or sessionStorage.
 
 Settings use the Obsidian declarative API. Connection fields, display limits, import mode, and the default template appear in global settings search. Connection drafts are saved only after validation.
 
@@ -108,6 +118,8 @@ For manual testing in Obsidian, run `node tests/fixtures/webdav-server.mjs`. It 
 
 For 0.3.2, checks passed on Node 22 and 24: 53 tests passed and the private-sample test was skipped. In Windows Obsidian 1.13.7, manual checks confirmed global settings search, connection testing without saving drafts, connection saving, initial cache writes, and replacement of existing cache files using a local synthetic backup. Original connection and cache files were restored and their hashes checked afterward. Note imports and real remote services were not retested in this round.
 
+On 2026-10-07, Windows Obsidian 1.14.4 reproduced an existing-cache refresh failure: the adapter rejected renaming over the destination. After the backup-and-promote fix, two consecutive refreshes against the configured real WebDAV service succeeded with six unchanged books and zero failures; the cache timestamp advanced and no staging or backup files remained. Note insertion was not retested in this round.
+
 For 0.2.0, checks passed on Node 22, Node 24, and an independent installation: 44 tests passed and the private-sample test was skipped. Build hashes matched, tag and ZIP checks passed, and the dependency audit reported no known vulnerabilities. GitHub build and release workflows also passed.
 
 Earlier manual checks in Windows Obsidian 1.13.7 covered connection testing, native password storage and retrieval, refreshes, cursor insertion, appending, replacement, repeated-import confirmation, template fields, and long titles using synthetic accounts and a local server. An earlier private-sample check compared 44 records. Real remote WebDAV services, Obsidian 1.13.0, other operating systems, and password retrieval after a full app restart remain untested.
@@ -116,11 +128,13 @@ The development `obsidian` package pins an older moment dependency; this project
 
 `skipLibCheck` skips checks inside dependency declarations because the Obsidian 1.13.1 SDK declarations omit `onHistoryBack` from three classes implementing `HistoryHandler`. Strict checking remains enabled for project code.
 
+The 2026-10-07 review fixes passed 82 automated checks (one private-sample check skipped). Windows Obsidian 1.14.4 verified draft clearing across native settings reconstruction, choosing the sole saved Keychain, cancelling slow checks and ignoring late responses. Queue cancellation and committed saves used an isolated plugin instance with controlled persistence; overlapping preference failures used controlled saves. Import failure, deferred library updates and retry were verified using a real temporary Markdown file and the vault write API; the temporary file was removed. The original connection remained intact and its connection test found six annotation files. Cross-platform and restart credential checks were not repeated.
+
 ## Release process
 
 1. Update `manifest.json`, `package.json`, `package-lock.json`, and `versions.json` together. Describe the changes in `CHANGELOG.md`.
-2. Run `npm ci`, `npm run check`, and `npm run check:release -- 0.3.2` with the intended version to check metadata, compatibility, licenses, and build files.
-3. Commit the source and release configuration, then push a tag matching the version exactly, such as `0.3.2`, without a `v` prefix.
+2. Run `npm ci`, `npm run check`, and `npm run check:release -- 0.4.0` with the intended version to check metadata, compatibility, licenses, and build files.
+3. Commit the source and release configuration, then push a tag matching the version exactly, such as `0.4.0`, without a `v` prefix.
 4. The release workflow checks the build, generates provenance attestations for `main.js`, `manifest.json`, and `styles.css`, and uploads only these three plugin files. The project license remains in the repository; third-party notices are included in `main.js`.
 
 For a first community-directory submission, follow the [official Obsidian instructions](https://docs.obsidian.md/Plugins/Releasing/Submit%20your%20plugin). A published GitHub release and acceptance into the community directory are separate steps.

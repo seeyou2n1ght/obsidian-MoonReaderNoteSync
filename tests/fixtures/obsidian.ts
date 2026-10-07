@@ -103,6 +103,7 @@ export class DropdownComponent {
     constructor(el: HTMLElement) { this.selectEl = el.createEl('select'); }
     addOption(value: string, text: string) { const option = new Option(text, value); this.selectEl.add(option); return this; }
     setValue(value: string) { this.selectEl.value = value; return this; }
+    setDisabled(value: boolean) { this.selectEl.disabled = value; return this; }
     onChange(fn: any) { this.selectEl.addEventListener('change', () => fn(this.selectEl.value)); return this; }
 }
 export class TextComponent {
@@ -134,14 +135,16 @@ export class PluginSettingTab {
     }
 }
 export class Setting {
-    settingEl: HTMLElement; controlEl: HTMLElement; label: HTMLElement;
+    settingEl: HTMLElement; controlEl: HTMLElement; label: HTMLElement; nameEl: HTMLElement; descEl: HTMLElement;
     constructor(el: HTMLElement) {
         this.settingEl = el.createDiv({ cls: 'setting-item' });
         this.label = this.settingEl.createDiv({ cls: 'setting-item-info' });
+        this.nameEl = this.label.createDiv({ cls: 'setting-item-name' });
+        this.descEl = this.label.createDiv({ cls: 'setting-item-description' });
         this.controlEl = this.settingEl.createDiv({ cls: 'setting-item-control' });
     }
-    setName(name: string) { this.label.setText(name); this.controlEl.querySelectorAll('input,select').forEach(el => el.setAttribute('aria-label', name)); return this; }
-    setDesc(desc: string) { this.label.createDiv({ cls: 'moonreader-meta', text: desc }); return this; }
+    setName(name: string) { this.nameEl.setText(name); this.controlEl.querySelectorAll('input,select').forEach(el => el.setAttribute('aria-label', name)); return this; }
+    setDesc(desc: string) { this.descEl.setText(desc); return this; }
     setHeading() { this.settingEl.addClass('setting-item-heading'); return this; }
     addButton(fn: any) { fn(new ButtonComponent(this.controlEl)); return this; }
     addText(fn: any) { const text = new TextComponent(this.controlEl); text.inputEl.setAttribute('aria-label', this.label.textContent || ''); fn(text); return this; }

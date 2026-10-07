@@ -30,6 +30,8 @@ async function connected(h, dav) {
     await h.plugin.updateSettings({ webDavUrl: dav.url, username: 'reader', secretId: 'moonreader-test' });
     return new h.WebDAVClient(dav.url, 'reader', 'synthetic-test-password');
 }
+function submitConnection(tab) { const button = tab.containerEl.querySelector('[data-action="save-connection"]'); assert.ok(button); return button; }
+function passwordInput(tab) { return tab.containerEl.querySelector('.moonreader-new-password input[type=password]'); }
 function settings(h) {
     const tab = new h.MoonReaderWebDAVSettingTab(h.app, h.plugin);
     h.document.body.append(tab.containerEl); tab.display(); return tab;
@@ -50,6 +52,28 @@ test('loopback WebDAV: HTTP authentication, XML, encoded href, inflate and disk 
     assert.deepEqual(persisted, h.plugin.cache);
     await h.plugin.refresh();
     assert.equal(dav.state.requests.filter(r => r.method === 'GET').length, 1);
+    assert.match(h.plugin.status, /^Refresh complete: 0 updated, 1 unchanged, 0 failed/);
+    assert.deepEqual(JSON.parse(await fs.readFile(join(h.vault, h.dir, cacheFiles[0]), 'utf8')), h.plugin.cache);
+});
+
+test('a successful connection test does not hide a local cache replacement failure', async t => {
+    const h = await harness(t), dav = await server(t);
+    await connected(h, dav); await h.plugin.refresh();
+    const before = h.plugin.cache;
+    assert.equal((await h.WebDAVClient.testConnection(dav.url, 'reader', 'synthetic-test-password')).length, 1);
+    const adapter = h.app.vault.adapter, rename = adapter.rename;
+    adapter.rename = async (from, to) => {
+        if (from.endsWith('.tmp')) throw new Error('Controlled promotion failure');
+        return rename.call(adapter, from, to);
+    };
+    await h.plugin.refresh();
+    assert.equal(h.plugin.cache, before);
+    assert.match(h.plugin.status, /Remote check completed, but saving the local cache failed/);
+    adapter.rename = rename;
+    await h.plugin.loadCache();
+    assert.deepEqual(h.plugin.cache, before);
+    await h.plugin.refresh();
+    assert.match(h.plugin.status, /^Refresh complete/);
 });
 test('WebDAV parses namespaces and split propstats, but rejects malformed and inaccessible listings', async t => {
     const h = await harness(t), dav = await server(t), client = await connected(h, dav);
@@ -116,16 +140,20 @@ test('configuration typing does not save; first save validates HTTP and stores o
     const h = await harness(t), dav = await server(t), tab = settings(h);
     change(h, input(tab.containerEl, 'WebDAV folder URL'), dav.url);
     change(h, input(tab.containerEl, 'Username'), 'reader');
-    change(h, input(tab.containerEl, 'Password or app password'), 'synthetic-test-password');
+    button(tab.containerEl, 'New Keychain').click();
+    change(h, passwordInput(tab), 'synthetic-test-password');
     assert.equal(h.state.saves, 0); assert.equal(dav.state.requests.length, 0);
-    button(tab.containerEl, 'Save connection').click();
+    submitConnection(tab).click();
     await until(() => !h.plugin.connectionSaving);
     assert.equal(h.state.saves, 1);
     const saved = JSON.parse(await fs.readFile(join(h.vault, h.dir, 'data.json'), 'utf8'));
     assert.equal(h.app.secretStorage.getSecret(saved.secretId), 'synthetic-test-password');
     assert.ok(!JSON.stringify(saved).includes('synthetic-test-password'));
     assert.ok(!('encryptedPass' in saved)); assert.ok(!('keyFilePath' in saved));
-    assert.equal(input(tab.containerEl, 'Password or app password').value, '');
+    assert.equal(passwordInput(tab).value, '');
+    assert.match(saved.secretId, /^moonreader-127-0-0-1-[a-f0-9]{8}$/);
+    assert.equal(tab.containerEl.querySelector('.moonreader-credential-name').textContent, saved.secretId);
+    assert.equal(tab.containerEl.querySelector('.moonreader-keychain select').value, h.plugin.settings.secretId);
     assert.match(tab.containerEl.textContent, /Connection saved/);
     tab.hide();
 });
@@ -134,14 +162,14 @@ test('failed connection keeps old settings; hiding the form cancels an in-flight
     await connected(h, dav);
     const tab = settings(h), before = JSON.stringify(h.plugin.settings);
     dav.state.status = 403;
-    button(tab.containerEl, 'Save connection').click();
+    submitConnection(tab).click();
     await until(() => !h.plugin.connectionSaving);
     assert.equal(JSON.stringify(h.plugin.settings), before);
     assert.match(tab.containerEl.textContent, /Authentication or access denied/);
     dav.state.status = 207;
     const gate = deferred(); dav.state.beforeList = () => gate.promise;
     const saves = h.state.saves;
-    button(tab.containerEl, 'Save connection').click();
+    submitConnection(tab).click();
     await until(() => dav.state.requests.length === 2);
     tab.hide(); gate.resolve();
     await until(() => !h.plugin.connectionSaving);
@@ -159,12 +187,12 @@ test('settings disk failure leaves effective settings unchanged and allows retry
     change(h, preference, 'append', 'change');
     await until(() => preference.value === 'ask');
     assert.equal(JSON.stringify(h.plugin.settings), before);
-    button(tab.containerEl, 'Save connection').click();
+    submitConnection(tab).click();
     await until(() => !h.plugin.connectionSaving);
     assert.equal(JSON.stringify(h.plugin.settings), before);
-    assert.equal(button(tab.containerEl, 'Save connection').disabled, false);
+    assert.equal(submitConnection(tab).disabled, false);
     h.state.beforeSave = null;
-    button(tab.containerEl, 'Save connection').click();
+    submitConnection(tab).click();
     await until(() => !h.plugin.connectionSaving);
     assert.equal(h.plugin.settings.webDavUrl, dav.url + 'new/');
     tab.hide();
@@ -256,7 +284,8 @@ test('testing draft connection authenticates without saving settings, writing ke
     const before = JSON.stringify(h.plugin.settings);
     change(h, input(tab.containerEl, 'WebDAV folder URL'), dav.url);
     change(h, input(tab.containerEl, 'Username'), 'reader');
-    change(h, input(tab.containerEl, 'Password or app password'), 'synthetic-test-password');
+    button(tab.containerEl, 'New Keychain').click();
+    change(h, passwordInput(tab), 'synthetic-test-password');
     button(tab.containerEl, 'Test connection').click();
     button(tab.containerEl, 'Test connection').click();
     await until(() => !h.plugin.connectionSaving);
@@ -266,7 +295,7 @@ test('testing draft connection authenticates without saving settings, writing ke
     assert.deepEqual(dav.state.requests.map(request => request.method), ['PROPFIND']);
     assert.equal(dav.state.authValid, true);
     assert.match(tab.containerEl.textContent, /Connection successful; found 1/);
-    assert.notEqual(input(tab.containerEl, 'Password or app password').value, '');
+    assert.notEqual(passwordInput(tab).value, '');
     tab.hide();
 });
 
@@ -384,6 +413,209 @@ test('credential save failures never replace the old reference or password; retr
     assert.equal(h.secretState.writes, writes, 'Unchanged credentials must reuse the existing entry');
 });
 
+test('settings display legacy credential names without migration, drafts or password disclosure', async t => {
+    const h = await harness(t), dav = await server(t);
+    await connected(h, dav);
+    const legacyId = 'moonreader-12345678-1234-1234-1234-123456789abc';
+    h.secrets.set(legacyId, 'synthetic-test-password');
+    h.plugin.settings.secretId = legacyId;
+    const tab = settings(h), details = () => tab.containerEl.querySelector('.moonreader-keychain').textContent;
+    assert.ok(details().includes(legacyId));
+    assert.equal(tab.containerEl.querySelector('.moonreader-keychain select').value, h.plugin.settings.secretId);
+    assert.ok(!tab.containerEl.textContent.includes('synthetic-test-password'));
+    button(tab.containerEl, 'New Keychain').click();
+    change(h, passwordInput(tab), 'unsaved-password');
+    assert.ok(details().includes(legacyId));
+    assert.equal(tab.containerEl.querySelector('.moonreader-credential').hidden, false);
+    button(tab.containerEl, 'Cancel creation').click();
+    assert.ok(details().includes(legacyId));
+    assert.equal(tab.containerEl.querySelector('.moonreader-keychain select').value, h.plugin.settings.secretId);
+    const writes = h.secretState.writes;
+    submitConnection(tab).click(); await until(() => !h.plugin.connectionSaving);
+    assert.equal(h.plugin.settings.secretId, legacyId);
+    assert.equal(h.secretState.writes, writes);
+    h.secrets.delete(legacyId);
+    button(tab.containerEl, 'Test connection').click(); await until(() => !h.plugin.connectionSaving);
+    assert.match(details(), /Password unavailable/);
+    h.secretState.unavailable = true;
+    tab.hide(); tab.display();
+    assert.match(details(), /Password unavailable/);
+    h.plugin.settings.secretId = '';
+    tab.hide(); tab.display();
+    assert.equal(tab.containerEl.querySelector('.moonreader-keychain select').selectedIndex, -1);
+    assert.equal(tab.containerEl.querySelector('.moonreader-credential-name').hidden, true);
+    tab.hide();
+});
+
+test('new credential names use a bounded server label, omit account and path, and keep old entries', async t => {
+    const h = await harness(t);
+    await h.plugin.saveConnection('https://NAS.Example.test/private-folder/', 'private-account', 'synthetic-password', () => true);
+    const first = h.plugin.settings.secretId;
+    assert.match(first, /^moonreader-nas-example-test-[a-f0-9]{8}$/);
+    await h.plugin.saveConnection('https://NAS.Example.test/private-folder/', 'private-account', 'replacement-password', () => true);
+    assert.notEqual(h.plugin.settings.secretId, first);
+    assert.equal(h.secrets.get(first), 'synthetic-password');
+    await h.plugin.saveConnection(`https://${'a'.repeat(60)}.test/`, 'private-account', 'synthetic-password', () => true);
+    assert.match(h.plugin.settings.secretId, /^moonreader-a{40}-[a-f0-9]{8}$/);
+    await h.plugin.saveConnection('http://[::1]/dav/', 'private-account', 'synthetic-password', () => true);
+    assert.match(h.plugin.settings.secretId, /^moonreader-1-[a-f0-9]{8}$/);
+});
+
+test('choosing and testing an existing credential writes nothing; saving uses its exact reference', async t => {
+    const h = await harness(t), dav = await server(t);
+    await connected(h, dav);
+    const oldId = h.plugin.settings.secretId, chosen = 'shared-webdav';
+    h.secrets.set(chosen, 'synthetic-test-password');
+    const tab = settings(h), picker = tab.containerEl.querySelector('.moonreader-keychain select');
+    const writes = h.secretState.writes, saves = h.state.saves;
+    change(h, picker, chosen, 'change');
+    assert.equal(h.plugin.settings.secretId, oldId);
+    assert.ok(tab.containerEl.querySelector('.moonreader-credential').textContent.includes(oldId));
+    button(tab.containerEl, 'Test connection').click(); await until(() => !h.plugin.connectionSaving);
+    assert.equal(h.state.saves, saves); assert.equal(h.secretState.writes, writes);
+    assert.equal(h.plugin.settings.secretId, oldId);
+    submitConnection(tab).click(); await until(() => !h.plugin.connectionSaving);
+    assert.equal(h.plugin.settings.secretId, chosen);
+    assert.equal(h.secretState.writes, writes);
+    assert.ok(tab.containerEl.querySelector('.moonreader-credential').textContent.includes(chosen));
+    assert.equal(h.secrets.get(oldId), 'synthetic-test-password');
+    const persisted = JSON.parse(await fs.readFile(join(h.vault, h.dir, 'data.json'), 'utf8'));
+    assert.equal(persisted.secretId, chosen);
+    tab.hide();
+});
+
+test('credential modes are exclusive; blank new password cannot fall back, and cancel restores the draft selection', async t => {
+    const h = await harness(t), dav = await server(t);
+    await connected(h, dav);
+    h.secrets.set('shared-webdav', 'synthetic-test-password');
+    const tab = settings(h), picker = tab.containerEl.querySelector('.moonreader-keychain select');
+    const existing = tab.containerEl.querySelector('.moonreader-existing-credential');
+    const newPassword = tab.containerEl.querySelector('.moonreader-new-password');
+    assert.equal(submitConnection(tab).textContent, 'Verify and save connection');
+    assert.equal(existing.hidden, false); assert.equal(newPassword.hidden, true);
+    assert.equal(passwordInput(tab).disabled, true);
+    change(h, picker, 'shared-webdav', 'change');
+    button(tab.containerEl, 'New Keychain').click();
+    assert.equal(submitConnection(tab).textContent, 'Create Keychain and save connection');
+    assert.equal(existing.hidden, true); assert.equal(newPassword.hidden, false);
+    assert.equal(picker.disabled, true); assert.equal(passwordInput(tab).disabled, false);
+    assert.equal(h.document.activeElement, tab.containerEl.querySelector('input[aria-label="Keychain name"]'));
+    submitConnection(tab).click(); await until(() => !h.plugin.connectionSaving);
+    assert.match(tab.containerEl.textContent, /Enter your new password/);
+    assert.equal(dav.state.requests.length, 0);
+    change(h, passwordInput(tab), 'discarded-password');
+    button(tab.containerEl, 'Cancel creation').click();
+    assert.equal(passwordInput(tab).value, ''); assert.equal(passwordInput(tab).disabled, true);
+    assert.equal(existing.hidden, false); assert.equal(newPassword.hidden, true);
+    assert.equal(picker.value, 'shared-webdav'); assert.equal(picker.disabled, false);
+    assert.equal(submitConnection(tab).textContent, 'Verify and save connection');
+    submitConnection(tab).click(); await until(() => !h.plugin.connectionSaving);
+    assert.equal(h.plugin.settings.secretId, 'shared-webdav');
+    tab.hide();
+});
+
+test('credential feedback distinguishes the saved entry from drafts and clears reverted changes', async t => {
+    const h = await harness(t), dav = await server(t);
+    await connected(h, dav);
+    h.secrets.set('shared-webdav', 'synthetic-test-password');
+    const tab = settings(h), oldId = h.plugin.settings.secretId;
+    const status = () => tab.containerEl.querySelector('.moonreader-status');
+    button(tab.containerEl, 'Test connection').click(); await until(() => !h.plugin.connectionSaving);
+    assert.ok(!status().textContent.toLowerCase().includes('not saved'));
+    button(tab.containerEl, 'New Keychain').click();
+    assert.equal(status().dataset.state, 'dirty');
+    button(tab.containerEl, 'Cancel creation').click();
+    assert.equal(status().dataset.state, 'saved');
+    assert.equal(tab.containerEl.querySelector('.moonreader-credential').hidden, true);
+    change(h, input(tab.containerEl, 'Username'), 'changed-reader');
+    assert.equal(status().dataset.state, 'dirty');
+    change(h, input(tab.containerEl, 'Username'), 'reader');
+    assert.equal(status().dataset.state, 'saved');
+    change(h, tab.containerEl.querySelector('.moonreader-keychain select'), 'shared-webdav', 'change');
+    assert.equal(tab.containerEl.querySelector('.moonreader-credential-name').textContent, oldId);
+    assert.equal(tab.containerEl.querySelector('.moonreader-credential').hidden, false);
+    assert.equal(tab.containerEl.querySelector('.moonreader-keychain select').value, 'shared-webdav');
+    button(tab.containerEl, 'Test connection').click(); await until(() => !h.plugin.connectionSaving);
+    assert.match(status().textContent, /Changes not saved/);
+    assert.equal(h.plugin.settings.secretId, oldId);
+    tab.hide();
+});
+
+test('failed new password save keeps the draft; retry commits and returns to existing credential mode', async t => {
+    const h = await harness(t), dav = await server(t);
+    await connected(h, dav);
+    const oldId = h.plugin.settings.secretId, tab = settings(h);
+    button(tab.containerEl, 'New Keychain').click();
+    change(h, passwordInput(tab), 'replacement-password');
+    dav.state.status = 403;
+    submitConnection(tab).click(); await until(() => !h.plugin.connectionSaving);
+    assert.equal(h.plugin.settings.secretId, oldId);
+    assert.equal(passwordInput(tab).value, 'replacement-password');
+    assert.equal(tab.containerEl.querySelector('.moonreader-new-password').hidden, false);
+    dav.state.status = 207;
+    const gate = deferred(); dav.state.beforeList = () => gate.promise;
+    submitConnection(tab).click(); await until(() => dav.state.requests.length === 2);
+    assert.equal(passwordInput(tab).disabled, true);
+    assert.equal(button(tab.containerEl, 'Cancel creation').disabled, true);
+    gate.resolve(); await until(() => !h.plugin.connectionSaving);
+    assert.notEqual(h.plugin.settings.secretId, oldId);
+    assert.equal(h.secrets.get(oldId), 'synthetic-test-password');
+    assert.equal(passwordInput(tab).value, ''); assert.equal(passwordInput(tab).disabled, true);
+    assert.equal(tab.containerEl.querySelector('.moonreader-new-password').hidden, true);
+    assert.equal(tab.containerEl.querySelector('.moonreader-existing-credential').hidden, false);
+    assert.equal(tab.containerEl.querySelector('.moonreader-keychain select').value, h.plugin.settings.secretId);
+    tab.hide();
+});
+
+test('selected credential failures preserve the old reference and never modify shared secrets', async t => {
+    const h = await harness(t), dav = await server(t);
+    await connected(h, dav);
+    const before = { ...h.plugin.settings }, chosen = 'shared-webdav';
+    h.secrets.set(chosen, 'synthetic-test-password');
+    const tab = settings(h), picker = tab.containerEl.querySelector('.moonreader-keychain select');
+    change(h, picker, chosen, 'change');
+    const writes = h.secretState.writes;
+    dav.state.status = 403;
+    submitConnection(tab).click(); await until(() => !h.plugin.connectionSaving);
+    assert.deepEqual(h.plugin.settings, before);
+    dav.state.status = 207;
+    h.state.beforeSave = async () => { throw new Error('Controlled settings failure'); };
+    submitConnection(tab).click(); await until(() => !h.plugin.connectionSaving);
+    assert.deepEqual(h.plugin.settings, before);
+    h.state.beforeSave = null;
+    dav.state.beforeList = async () => { h.secrets.set(chosen, 'changed-during-test'); };
+    submitConnection(tab).click(); await until(() => !h.plugin.connectionSaving);
+    assert.deepEqual(h.plugin.settings, before);
+    assert.match(tab.containerEl.textContent, /selected credential changed/);
+    dav.state.beforeList = null;
+    h.secrets.delete(chosen);
+    const requests = dav.state.requests.length;
+    submitConnection(tab).click(); await until(() => !h.plugin.connectionSaving);
+    assert.equal(dav.state.requests.length, requests);
+    assert.deepEqual(h.plugin.settings, before);
+    assert.equal(h.secretState.writes, writes);
+    tab.hide();
+});
+
+test('closing the form cancels selection; pending validation disables the picker and cancels saving', async t => {
+    const h = await harness(t), dav = await server(t);
+    await connected(h, dav);
+    const oldId = h.plugin.settings.secretId, chosen = 'shared-webdav';
+    h.secrets.set(chosen, 'synthetic-test-password');
+    const tab = settings(h);
+    change(h, tab.containerEl.querySelector('.moonreader-keychain select'), chosen, 'change');
+    tab.hide(); tab.display();
+    const picker = tab.containerEl.querySelector('.moonreader-keychain select');
+    assert.equal(picker.value, oldId);
+    change(h, picker, chosen, 'change');
+    const gate = deferred(); dav.state.beforeList = () => gate.promise;
+    submitConnection(tab).click(); await until(() => dav.state.requests.length === 1);
+    assert.equal(picker.disabled, true);
+    tab.hide(); gate.resolve(); await until(() => !h.plugin.connectionSaving);
+    assert.equal(h.plugin.settings.secretId, oldId);
+    assert.equal(h.state.saves, 1);
+});
+
 test('missing or unavailable keychain preserves cache and cancellation performs no credential write', async t => {
     const h = await harness(t), dav = await server(t);
     await connected(h, dav); h.plugin.cache.books = [book];
@@ -409,7 +641,7 @@ test('changing accounts or servers requires a newly entered password before any 
     assert.equal(dav.state.requests.length, 0); assert.deepEqual(h.plugin.settings, before);
     change(h, input(tab.containerEl, 'Username'), 'reader');
     change(h, input(tab.containerEl, 'WebDAV folder URL'), 'http://127.0.0.1:1/dav/');
-    button(tab.containerEl, 'Save connection').click();
+    submitConnection(tab).click();
     await until(() => !h.plugin.connectionSaving);
     assert.equal(dav.state.requests.length, 0); assert.deepEqual(h.plugin.settings, before);
 });
@@ -418,14 +650,15 @@ test('connection-only form omits preferences and marks a successful test as not 
     const h = await harness(t), dav = await server(t);
     const tab = new h.MoonReaderWebDAVSettingTab(h.app, h.plugin, () => {}, true);
     tab.display();
-    assert.ok(!tab.containerEl.querySelector('textarea')); assert.ok(!tab.containerEl.querySelector('select'));
-    assert.equal(tab.containerEl.querySelectorAll('input').length, 3);
+    assert.ok(!tab.containerEl.querySelector('textarea')); assert.ok(!tab.containerEl.querySelector('select[aria-label^="Default import mode"]'));
+    assert.equal(tab.containerEl.querySelectorAll('input').length, 4);
     change(h, input(tab.containerEl, 'WebDAV folder URL'), dav.url);
     change(h, input(tab.containerEl, 'Username'), 'reader');
-    change(h, input(tab.containerEl, 'Password or app password'), 'synthetic-test-password');
+    button(tab.containerEl, 'New Keychain').click();
+    change(h, passwordInput(tab), 'synthetic-test-password');
     button(tab.containerEl, 'Test connection').click(); await until(() => !h.plugin.connectionSaving);
-    assert.equal(tab.containerEl.querySelector('[role=status]').dataset.state, 'tested');
-    assert.match(tab.containerEl.textContent, /Not saved/);
+    assert.equal(tab.containerEl.querySelector('.moonreader-status').dataset.state, 'tested');
+    assert.match(tab.containerEl.textContent, /not saved/i);
     assert.equal(h.secretState.writes, 0); assert.equal(h.state.saves, 0);
     tab.hide();
 });
@@ -622,7 +855,8 @@ test('declarative settings index every editable field without creating UI or sav
     const names = definitions.flatMap(group => group.items || [group]).map(item => item.name);
     assert.ok(names.includes('WebDAV folder URL'));
     assert.ok(names.includes('Username'));
-    assert.ok(names.includes('Password or app password'));
+    assert.ok(names.includes('Connection credential'));
+    assert.ok(!names.includes('Password or app password'));
     assert.ok(names.includes('Books shown'));
     assert.ok(names.includes('Default import mode'));
     assert.ok(names.includes('Default note template'));
@@ -637,6 +871,145 @@ test('declarative settings index every editable field without creating UI or sav
     assert.equal(h.state.saves, 0); tab.hide();
 });
 
+test('custom credential names are drafts until saved and use the exact name without replacing the old entry', async t => {
+    const h = await harness(t), dav = await server(t); await connected(h, dav);
+    const tab = settings(h), oldId = h.plugin.settings.secretId;
+    button(tab.containerEl, 'New Keychain').click();
+    const name = tab.containerEl.querySelector('input[aria-label="Keychain name"]');
+    assert.match(name.value, /^moonreader-127-0-0-1-[a-f0-9]{8}$/);
+    assert.equal(name.selectionStart, 0); assert.equal(name.selectionEnd, name.value.length);
+    change(h, name, 'moonreader-home-nas'); change(h, passwordInput(tab), 'synthetic-test-password');
+    const writes = h.secretState.writes;
+    button(tab.containerEl, 'Test connection').click(); await until(() => !h.plugin.connectionSaving);
+    assert.equal(h.secretState.writes, writes); assert.equal(h.plugin.settings.secretId, oldId);
+    assert.equal(name.value, 'moonreader-home-nas');
+    submitConnection(tab).click(); await until(() => !h.plugin.connectionSaving);
+    assert.equal(h.plugin.settings.secretId, 'moonreader-home-nas');
+    assert.equal(h.secrets.get('moonreader-home-nas'), 'synthetic-test-password');
+    assert.equal(h.secrets.get(oldId), 'synthetic-test-password');
+    assert.equal(name.value, ''); assert.equal(name.disabled, true);
+    tab.hide();
+});
+
+test('invalid and duplicate names report inline without requests or secret writes; collision during testing is refused', async t => {
+    const h = await harness(t), dav = await server(t); await connected(h, dav);
+    h.secrets.set('shared-webdav', 'untouched-shared-password');
+    const tab = settings(h), before = { ...h.plugin.settings }, writes = h.secretState.writes;
+    button(tab.containerEl, 'New Keychain').click();
+    const name = tab.containerEl.querySelector('input[aria-label="Keychain name"]');
+    change(h, passwordInput(tab), 'synthetic-test-password');
+    for (const value of ['', 'Home NAS', '中文', 'a'.repeat(65), 'shared-webdav']) {
+        change(h, name, value);
+        assert.equal(name.getAttribute('aria-invalid'), 'true');
+        submitConnection(tab).click(); await until(() => !h.plugin.connectionSaving);
+        assert.equal(h.document.activeElement, name);
+        assert.equal(dav.state.requests.length, 0); assert.equal(h.secretState.writes, writes);
+        assert.deepEqual(h.plugin.settings, before);
+    }
+    assert.equal(h.secrets.get('shared-webdav'), 'untouched-shared-password');
+    change(h, name, 'moonreader-home-nas');
+    assert.equal(name.getAttribute('aria-invalid'), 'false');
+    dav.state.beforeList = async () => { h.secrets.set('moonreader-home-nas', 'other-writer-password'); };
+    submitConnection(tab).click(); await until(() => !h.plugin.connectionSaving);
+    assert.deepEqual(h.plugin.settings, before);
+    assert.equal(h.secrets.get('moonreader-home-nas'), 'other-writer-password');
+    assert.equal(h.secretState.writes, writes);
+    assert.match(tab.containerEl.querySelector('.moonreader-credential-name-error').textContent, /already exists/);
+    button(tab.containerEl, 'Cancel creation').click();
+    assert.equal(name.value, ''); assert.equal(passwordInput(tab).value, '');
+    tab.hide();
+});
+
+test('custom name save failures retain the previous connection and do not clear another writer replacement', async t => {
+    const h = await harness(t), dav = await server(t); await connected(h, dav);
+    const before = { ...h.plugin.settings };
+    h.state.beforeSave = async () => { throw new Error('Controlled disk failure'); };
+    await assert.rejects(h.plugin.saveConnection(dav.url, 'reader', 'new-password', () => true, undefined, 'moonreader-home-nas'));
+    assert.deepEqual(h.plugin.settings, before);
+    assert.ok(!h.secrets.get('moonreader-home-nas'));
+    h.state.beforeSave = null;
+    await h.plugin.saveConnection(dav.url, 'reader', 'new-password', () => true, undefined, 'moonreader-home-nas');
+    assert.equal(h.plugin.settings.secretId, 'moonreader-home-nas');
+    const beforeForeignWrite = { ...h.plugin.settings };
+    h.state.beforeSave = async () => {
+        h.secrets.set('moonreader-home-nas-2', 'other-writer-password');
+        throw new Error('Controlled disk failure');
+    };
+    await assert.rejects(h.plugin.saveConnection(dav.url, 'reader', 'new-password', () => true, undefined, 'moonreader-home-nas-2'));
+    assert.equal(h.secrets.get('moonreader-home-nas-2'), 'other-writer-password');
+    assert.deepEqual(h.plugin.settings, beforeForeignWrite);
+});
+
+test('settings group the connection fields and keep preference feedback out of connection state', async t => {
+    const h = await harness(t), dav = await server(t);
+    await connected(h, dav);
+    const tab = settings(h);
+    const headings = tab.getSettingDefinitions().filter(item => item.type === 'group').map(item => item.heading);
+    assert.deepEqual(headings, ['Backup connection', 'Library display', 'Note insertion', 'Note template']);
+    const card = tab.containerEl.querySelector('.moonreader-connection-card');
+    assert.ok(card.contains(input(tab.containerEl, 'WebDAV folder URL')));
+    assert.ok(card.contains(input(tab.containerEl, 'Username')));
+    assert.ok(card.contains(tab.containerEl.querySelector('.moonreader-keychain')));
+    assert.ok(card.contains(submitConnection(tab)));
+    change(h, input(tab.containerEl, 'Username'), 'draft-reader');
+    const status = card.querySelector('.moonreader-status'), before = status.textContent;
+    const limit = input(tab.containerEl, 'Books shown');
+    change(h, limit, '-1');
+    assert.match(limit.closest('.setting-item').querySelector('.moonreader-preference-feedback').textContent, /non-negative integer/);
+    assert.equal(status.textContent, before); assert.equal(status.dataset.state, 'dirty');
+    change(h, limit, '3'); await until(() => h.plugin.settings.bookListLimit === 3);
+    assert.equal(limit.closest('.setting-item').querySelector('.moonreader-preference-feedback').textContent, 'Saved.');
+    assert.equal(status.textContent, before); assert.equal(h.plugin.settings.username, 'reader');
+    const mode = tab.containerEl.querySelector('select[aria-label^="Default import mode"]');
+    change(h, mode, 'append', 'change'); await until(() => h.plugin.settings.insertAction === 'append');
+    assert.equal(mode.closest('.setting-item').querySelector('.moonreader-preference-feedback').textContent, 'Saved.');
+    assert.equal(status.textContent, before);
+    const editor = tab.containerEl.querySelector('.moonreader-settings-template textarea');
+    change(h, editor, '');
+    button(tab.containerEl, 'Save default template').click();
+    assert.match(editor.closest('.moonreader-settings-template').querySelector('.moonreader-preference-feedback').textContent, /cannot be empty/);
+    change(h, editor, '{note}');
+    button(tab.containerEl, 'Save default template').click(); await until(() => h.plugin.settings.noteTemplate === '{note}');
+    assert.equal(editor.closest('.moonreader-settings-template').querySelector('.moonreader-preference-feedback').textContent, 'Default template saved.');
+    assert.equal(status.textContent, before);
+    tab.hide();
+});
+
+test('existing credential list offers only references, refreshes on focus and never exposes passwords', async t => {
+    const h = await harness(t), dav = await server(t); await connected(h, dav);
+    const tab = settings(h), picker = tab.containerEl.querySelector('.moonreader-keychain select');
+    assert.deepEqual([...picker.options].map(option => option.value), [h.plugin.settings.secretId]);
+    assert.equal(picker.getAttribute('aria-label'), 'Saved Keychains');
+    assert.equal(picker.options[0].textContent, h.plugin.settings.secretId);
+    assert.equal(tab.containerEl.querySelector('.moonreader-credential').hidden, true);
+    h.secrets.set('shared-webdav', 'private-synthetic-password');
+    picker.focus();
+    assert.ok([...picker.options].some(option => option.value === 'shared-webdav'));
+    assert.ok(!tab.containerEl.textContent.includes('private-synthetic-password'));
+    assert.ok(!tab.containerEl.textContent.includes('Password readable'));
+    assert.deepEqual([...tab.containerEl.querySelector('.moonreader-existing-credential').querySelectorAll('button')].map(button => button.textContent), ['New Keychain']);
+    assert.equal(h.state.saves, 1); assert.equal(h.secretState.writes, 1);
+    tab.hide();
+});
+
+test('reused settings controls after hide report empty selection immediately and can test again', async t => {
+    const h = await harness(t), dav = await server(t); await connected(h, dav);
+    const tab = settings(h), picker = tab.containerEl.querySelector('.moonreader-keychain select');
+    const before = { ...h.plugin.settings }, writes = h.secretState.writes;
+    tab.hide(); // Native host may retain and reattach these controls without rerendering.
+    assert.equal(tab.owner, null);
+    change(h, picker, '', 'change');
+    button(tab.containerEl, 'Test connection').click(); await until(() => !h.plugin.connectionSaving);
+    const status = tab.containerEl.querySelector('.moonreader-status');
+    assert.equal(status.dataset.state, 'error'); assert.match(status.textContent, /No credential selected/);
+    assert.equal(dav.state.requests.length, 0); assert.equal(picker.disabled, false);
+    assert.equal(tab.saving, false); assert.deepEqual(h.plugin.settings, before); assert.equal(h.secretState.writes, writes);
+    change(h, picker, before.secretId, 'change');
+    button(tab.containerEl, 'Test connection').click(); await until(() => !h.plugin.connectionSaving);
+    assert.equal(status.dataset.state, 'tested'); assert.equal(dav.state.requests.length, 1);
+    tab.hide();
+});
+
 test('old credential fields are excluded on load and preferences survive without secret migration', async t => {
     const h = await harness(t);
     h.plugin.loadData = async () => ({ webDavUrl: 'https://fixture.test/dav/', username: 'reader', encryptedPass: 'legacy-ciphertext', keyFilePath: 'unused.key', noteTemplate: '{note}', insertAction: 'append' });
@@ -648,3 +1021,254 @@ test('old credential fields are excluded on load and preferences survive without
     assert.equal(h.secretState.writes, 0); assert.equal(h.state.saves, 0);
 });
 
+
+
+test('first connection explicitly selects saved Keychains and empty state offers only creation', async t => {
+    const h = await harness(t);
+    let tab = settings(h), picker = tab.containerEl.querySelector('.moonreader-keychain select');
+    assert.equal(picker.options.length, 0); assert.equal(picker.hidden, true);
+    assert.equal(tab.containerEl.querySelector('.moonreader-selection-hint').textContent, 'No saved Keychains yet');
+    assert.equal(tab.containerEl.querySelector('.moonreader-selection-hint').hidden, false);
+    button(tab.containerEl, 'New Keychain').click();
+    assert.equal(tab.containerEl.querySelector('.moonreader-existing-credential').hidden, true);
+    assert.equal(submitConnection(tab).textContent, 'Create Keychain and save connection');
+    button(tab.containerEl, 'Cancel creation').click();
+    assert.equal(tab.containerEl.querySelector('.moonreader-new-password').hidden, true);
+    tab.hide();
+    h.secrets.set('home-nas', 'synthetic-password');
+    tab = settings(h); picker = tab.containerEl.querySelector('.moonreader-keychain select');
+    assert.deepEqual([...picker.options].map(option => option.textContent), ['home-nas']);
+    assert.equal(picker.value, ''); assert.equal(picker.selectedIndex, -1);
+    assert.equal(tab.containerEl.querySelector('.moonreader-selection-hint').textContent, 'Choose a saved Keychain');
+    button(tab.containerEl, 'Test connection').click(); await until(() => !h.plugin.connectionSaving);
+    assert.match(tab.containerEl.querySelector('.moonreader-status').textContent, /No credential selected/);
+    change(h, picker, 'home-nas', 'change');
+    assert.equal(tab.containerEl.querySelector('.moonreader-selection-hint').hidden, true);
+    assert.equal(h.plugin.settings.secretId, ''); assert.equal(h.state.saves, 0); assert.equal(h.secretState.writes, 0);
+    tab.hide();
+});
+
+
+test('cached native setting definitions discard hidden drafts before rebuilding controls', async t => {
+    const h = await harness(t), dav = await server(t);
+    const tab = new h.MoonReaderWebDAVSettingTab(h.app, h.plugin);
+    const definitions = tab.getSettingDefinitions();
+    const render = () => {
+        tab.containerEl.empty();
+        for (const definition of definitions) {
+            const group = new h.host.SettingGroup(tab.containerEl).setHeading(definition.heading || '');
+            for (const item of definition.items || []) item.render?.(new h.host.Setting(group.listEl).setName(item.name).setDesc(item.desc || ''), group);
+        }
+    };
+    render();
+    change(h, input(tab.containerEl, 'WebDAV folder URL'), dav.url);
+    change(h, input(tab.containerEl, 'Username'), 'reader');
+    button(tab.containerEl, 'New Keychain').click();
+    change(h, tab.containerEl.querySelector('.moonreader-new-password input[type=text]'), 'unsaved-review-key');
+    change(h, passwordInput(tab), 'synthetic-test-password');
+    tab.hide(); render();
+    assert.equal(passwordInput(tab).value, '');
+    assert.equal(tab.containerEl.querySelector('.moonreader-new-password input[type=text]').value, '');
+    assert.equal(tab.containerEl.querySelector('.moonreader-new-password').hidden, true);
+    assert.equal(input(tab.containerEl, 'Username').value, h.plugin.settings.username);
+    assert.equal(input(tab.containerEl, 'WebDAV folder URL').value, h.plugin.settings.webDavUrl);
+    button(tab.containerEl, 'Test connection').click(); await until(() => !h.plugin.connectionSaving);
+    assert.match(tab.containerEl.querySelector('.moonreader-status').textContent, /No credential selected/);
+    assert.equal(dav.state.requests.length, 0); assert.equal(h.secretState.writes, 0);
+    tab.hide();
+});
+
+
+test('closing before queued connection commit cancels the save and clears only its new credential', async t => {
+    for (const createNew of [false, true]) {
+        const h = await harness(t), dav = await server(t); await connected(h, dav);
+        const before = { ...h.plugin.settings }, cache = h.plugin.cache;
+        const gate = deferred(); let entered = false;
+        h.state.beforeSave = async () => { if (!entered) { entered = true; await gate.promise; } };
+        const preference = h.plugin.updateSettings({ bookListLimit: 5 }); await until(() => entered);
+        const tab = settings(h); change(h, input(tab.containerEl, 'WebDAV folder URL'), dav.url + 'new/');
+        if (createNew) {
+            button(tab.containerEl, 'New Keychain').click();
+            change(h, tab.containerEl.querySelector('.moonreader-new-password input[type=text]'), 'queued-new-key');
+            change(h, passwordInput(tab), 'synthetic-test-password');
+        }
+        submitConnection(tab).click();
+        await until(() => dav.state.requests.length === 1);
+        await new Promise(resolve => setTimeout(resolve, 20));
+        tab.hide(); gate.resolve(); await preference; await until(() => !h.plugin.connectionSaving);
+        assert.equal(h.plugin.settings.webDavUrl, before.webDavUrl);
+        assert.equal(h.plugin.settings.secretId, before.secretId);
+        assert.equal(h.plugin.settings.bookListLimit, 5);
+        assert.equal(h.plugin.cache, cache); assert.equal(h.state.saves, 2);
+        if (createNew) { await until(() => h.secrets.get('queued-new-key') === ''); assert.equal(h.secrets.get('queued-new-key'), ''); }
+    }
+});
+
+test('a connection commit already writing completes its cache switch after the form closes', async t => {
+    const h = await harness(t), dav = await server(t); await connected(h, dav);
+    h.plugin.cache.books = [book]; const oldSource = h.plugin.cache.source;
+    const gate = deferred(); let entered = false;
+    h.state.beforeSave = async () => { entered = true; await gate.promise; };
+    const tab = settings(h); change(h, input(tab.containerEl, 'WebDAV folder URL'), dav.url + 'new/');
+    submitConnection(tab).click(); await until(() => entered);
+    tab.hide(); gate.resolve(); await until(() => !h.plugin.connectionSaving);
+    assert.equal(h.plugin.settings.webDavUrl, dav.url + 'new/');
+    assert.notEqual(h.plugin.cache.source, oldSource); assert.equal(h.plugin.cache.books.length, 0);
+});
+
+
+test('changing connection identity permits explicitly choosing the sole saved Keychain', async t => {
+    const h = await harness(t), dav = await server(t); await connected(h, dav);
+    const tab = settings(h), picker = tab.containerEl.querySelector('.moonreader-keychain select');
+    const id = h.plugin.settings.secretId, writes = h.secretState.writes;
+    change(h, input(tab.containerEl, 'Username'), 'another-reader');
+    assert.equal(picker.options.length, 1); assert.equal(picker.selectedIndex, -1);
+    assert.equal(tab.containerEl.querySelector('.moonreader-selection-hint').hidden, false);
+    change(h, picker, id, 'change');
+    button(tab.containerEl, 'Test connection').click(); await until(() => !h.plugin.connectionSaving);
+    assert.equal(dav.state.requests.length, 1); assert.equal(h.secretState.writes, writes);
+    assert.equal(h.plugin.settings.username, 'reader');
+    change(h, input(tab.containerEl, 'WebDAV folder URL'), 'http://127.0.0.1:1/dav/');
+    assert.equal(picker.selectedIndex, -1);
+    change(h, input(tab.containerEl, 'Username'), 'reader');
+    change(h, input(tab.containerEl, 'WebDAV folder URL'), dav.url);
+    assert.equal(picker.value, id);
+    tab.hide();
+});
+
+
+test('cancelling or closing a check releases its lock and its late completion cannot release a new check', async t => {
+    const h = await harness(t), dav = await server(t); await connected(h, dav);
+    const originalStatus = h.plugin.status;
+    const first = deferred(), second = deferred(); let calls = 0;
+    h.WebDAVClient.testConnection = () => ++calls === 1 ? first.promise : second.promise;
+    const oldTab = settings(h);
+    button(oldTab.containerEl, 'Test connection').click();
+    assert.equal(h.plugin.connectionOperation, 'test');
+    assert.equal(button(oldTab.containerEl, 'Cancel check').hidden, false);
+    const otherTab = settings(h);
+    button(otherTab.containerEl, 'Test connection').click();
+    assert.match(otherTab.containerEl.querySelector('.moonreader-status').textContent, /Another window is testing/);
+    await h.plugin.refresh(); assert.match(h.plugin.status, /being tested/);
+    oldTab.hide(); assert.equal(h.plugin.connectionSaving, false); assert.equal(h.plugin.status, originalStatus);
+    button(otherTab.containerEl, 'Test connection').click();
+    assert.equal(calls, 2); assert.equal(h.plugin.connectionSaving, true);
+    first.resolve([]); await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(h.plugin.connectionSaving, true);
+    assert.match(otherTab.containerEl.querySelector('.moonreader-status').textContent, /Checking connection/);
+    button(otherTab.containerEl, 'Cancel check').click();
+    assert.equal(h.plugin.connectionSaving, false);
+    assert.match(otherTab.containerEl.querySelector('.moonreader-status').textContent, /Check cancelled/);
+    assert.equal(button(otherTab.containerEl, 'Test connection').disabled, false);
+    second.resolve([]); await new Promise(resolve => setTimeout(resolve, 10));
+    assert.match(otherTab.containerEl.querySelector('.moonreader-status').textContent, /Check cancelled/);
+    assert.equal(h.state.saves, 1); otherTab.hide();
+});
+
+test('WebDAV connection checks time out, abort without a request when already cancelled, and allow retry', async t => {
+    const h = await harness(t), dav = await server(t);
+    const aborted = new AbortController(); aborted.abort();
+    await assert.rejects(h.WebDAVClient.testConnection(dav.url, 'reader', 'synthetic-password', aborted.signal), /cancelled/);
+    assert.equal(dav.state.requests.length, 0);
+    const gate = deferred(); dav.state.beforeList = () => gate.promise;
+    await assert.rejects(h.WebDAVClient.testConnection(dav.url, 'reader', 'synthetic-password', undefined, 40), /timed out/);
+    const cancel = new AbortController();
+    const pending = h.WebDAVClient.testConnection(dav.url, 'reader', 'synthetic-password', cancel.signal);
+    const rejection = assert.rejects(pending, /cancelled/);
+    await until(() => dav.state.requests.length === 2); cancel.abort(); await rejection;
+    gate.resolve(); dav.state.beforeList = null;
+    const files = await h.WebDAVClient.testConnection(dav.url, 'reader', 'synthetic-password');
+    assert.equal(files.length, 1);
+});
+
+
+test('preference feedback belongs to the latest edit across overlapping saves and failures', async t => {
+    for (const latestFails of [false, true]) {
+        const h = await harness(t), tab = settings(h), gate = deferred(); let calls = 0;
+        h.state.beforeSave = async () => {
+            const call = ++calls; if (call === 1) await gate.promise;
+            if (call === (latestFails ? 2 : 1)) throw new Error('Controlled overlapping save failure');
+        };
+        const limit = input(tab.containerEl, 'Books shown');
+        change(h, limit, '1'); change(h, limit, '10'); gate.resolve();
+        const expected = latestFails ? 1 : 10;
+        await until(() => h.plugin.settings.bookListLimit === expected && calls === 2);
+        await new Promise(resolve => setTimeout(resolve, 10));
+        assert.equal(limit.value, String(expected));
+        const feedback = limit.closest('.setting-item').querySelector('.moonreader-preference-feedback').textContent;
+        assert.ok(latestFails ? feedback.includes('Operation failed') : feedback === 'Saved.'); tab.hide();
+    }
+    const h = await harness(t), tab = settings(h), gate = deferred();
+    h.state.beforeSave = () => gate.promise;
+    const limit = input(tab.containerEl, 'Books shown'); change(h, limit, '1'); change(h, limit, '');
+    gate.resolve(); await until(() => h.plugin.settings.bookListLimit === 1);
+    assert.equal(limit.value, '');
+    assert.match(limit.closest('.setting-item').querySelector('.moonreader-preference-feedback').textContent, /non-negative integer/);
+    tab.hide();
+});
+
+test('older default-mode failures cannot undo a later successful choice', async t => {
+    const h = await harness(t), tab = settings(h), gate = deferred(); let calls = 0;
+    h.state.beforeSave = async () => { if (++calls === 1) { await gate.promise; throw new Error('Controlled first failure'); } };
+    const mode = tab.containerEl.querySelector('select[aria-label^="Default import mode"]');
+    change(h, mode, 'append', 'change'); change(h, mode, 'ask', 'change'); change(h, mode, 'append', 'change');
+    gate.resolve(); await until(() => calls === 3 && h.plugin.settings.insertAction === 'append');
+    await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(mode.value, 'append');
+    assert.equal(mode.closest('.setting-item').querySelector('.moonreader-preference-feedback').textContent, 'Saved.'); tab.hide();
+});
+
+test('a failed import catches up deferred cache, selection and preference changes before retry', async t => {
+    const h = await harness(t), modal = openImport(h), gate = deferred();
+    chooseMode(h, modal, 'append'); h.state.beforeWrite = () => gate.promise;
+    button(modal.contentEl, 'Append 1 notes').click(); await until(() => modal.panel.busy);
+    h.plugin.cache.books = [{ ...book, fileHref: 'https://fixture.test/dav/replacement.an', bookName: 'Replacement book', notes: [{ ...book.notes[0], highlightText: 'New highlight' }] }];
+    h.plugin.settings.bookListLimit = 1; h.plugin.notify();
+    assert.equal(modal.contentEl.querySelector('.moonreader-book-title').textContent, book.bookName);
+    h.state.failWrite = true; gate.resolve(); await until(() => !modal.panel.busy);
+    assert.equal(modal.contentEl.querySelector('.moonreader-book-item span').textContent, 'Replacement book');
+    assert.equal(modal.contentEl.querySelector('.moonreader-book-title').textContent, 'Replacement book');
+    assert.match(modal.contentEl.querySelector('.moonreader-import-feedback .moonreader-status').textContent, /Operation failed/);
+    await until(() => modal.contentEl.querySelector('.moonreader-preview').textContent.includes('New highlight'));
+    h.state.failWrite = false; h.state.beforeWrite = null;
+    button(modal.contentEl, 'Append 1 notes').click(); await until(() => h.state.writes === 1);
+    assert.ok(h.files.get(h.target).includes('New highlight')); assert.ok(!h.files.get(h.target).includes('> Highlight'));
+});
+
+test('an import records the source captured before a concurrent cache switch', async t => {
+    const h = await harness(t); h.plugin.cache.source = 'old-source';
+    const modal = openImport(h), gate = deferred(); chooseMode(h, modal, 'append'); h.state.beforeWrite = () => gate.promise;
+    button(modal.contentEl, 'Append 1 notes').click(); await until(() => modal.panel.busy);
+    h.plugin.cache = { ...h.plugin.cache, source: 'new-source', books: [] }; h.plugin.notify();
+    gate.resolve(); await until(() => !modal.panel.busy);
+    assert.ok(h.plugin.sessionImports.has(JSON.stringify(['old-source', book.fileHref, h.target.path])));
+    assert.ok(!h.plugin.sessionImports.has(JSON.stringify(['new-source', book.fileHref, h.target.path])));
+});
+
+
+test('reopening during a committed connection write stays disabled and then shows the committed identity', async t => {
+    const h = await harness(t), dav = await server(t); await connected(h, dav);
+    const tab = settings(h), definitions = tab.getSettingDefinitions(), gate = deferred(); let writing = false;
+    const render = () => {
+        tab.containerEl.empty();
+        for (const definition of definitions) {
+            const group = new h.host.SettingGroup(tab.containerEl).setHeading(definition.heading || '');
+            for (const item of definition.items || []) item.render?.(new h.host.Setting(group.listEl).setName(item.name).setDesc(item.desc || ''), group);
+        }
+    };
+    tab.hide(); render();
+    h.state.beforeSave = async () => { writing = true; await gate.promise; };
+    change(h, input(tab.containerEl, 'WebDAV folder URL'), dav.url + 'committed/');
+    submitConnection(tab).click(); await until(() => writing);
+    assert.equal(button(tab.containerEl, 'Cancel check').hidden, true);
+    tab.hide(); render();
+    assert.equal(h.plugin.connectionSaving, true);
+    assert.equal(input(tab.containerEl, 'WebDAV folder URL').disabled, true);
+    assert.equal(input(tab.containerEl, 'Username').disabled, true);
+    assert.equal(submitConnection(tab).disabled, true);
+    gate.resolve(); await until(() => !h.plugin.connectionSaving);
+    assert.equal(input(tab.containerEl, 'WebDAV folder URL').value, dav.url + 'committed/');
+    assert.equal(input(tab.containerEl, 'WebDAV folder URL').disabled, false);
+    assert.equal(tab.containerEl.querySelector('.moonreader-keychain select').value, h.plugin.settings.secretId);
+    tab.hide();
+});
