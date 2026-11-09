@@ -17,9 +17,12 @@ export class NotePreview extends Component {
         staging.addClass('markdown-rendered');
         try {
             await MarkdownRenderer.render(this.app, text, staging, sourcePath, owner);
-            if (revision === this.revision) this.el.replaceChildren(staging);
+            if (revision !== this.revision) return false;
+            this.el.replaceChildren(staging);
+            return true;
         } catch {
             if (revision === this.revision) this.el.setText(t('预览失败，请检查模板。', 'Preview failed. Check the template.'));
+            return false;
         }
     }
     onunload() { this.revision++; }

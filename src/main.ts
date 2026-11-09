@@ -1,5 +1,5 @@
 import { Plugin, MarkdownView, Modal, normalizePath } from 'obsidian';
-import { MoonReaderSyncSettings, DEFAULT_SETTINGS } from './settings';
+import { MoonReaderSyncSettings, DEFAULT_SETTINGS, isNoteOrder } from './settings';
 import { MoonReaderWebDAVSettingTab } from './ui/settingTab';
 import { WebDAVClient, normalizeWebDavUrl } from './utils/webdav';
 import { BookSuggestModal } from './ui/bookSuggestModal';
@@ -37,6 +37,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
             webDavUrl: typeof saved.webDavUrl === 'string' ? saved.webDavUrl : DEFAULT_SETTINGS.webDavUrl,
             username: typeof saved.username === 'string' ? saved.username : DEFAULT_SETTINGS.username,
             secretId: typeof saved.secretId === 'string' ? saved.secretId : '',
+            noteOrder: isNoteOrder(saved.noteOrder) ? saved.noteOrder : DEFAULT_SETTINGS.noteOrder,
             bookListLimit: typeof saved.bookListLimit === 'number' && Number.isSafeInteger(saved.bookListLimit) && saved.bookListLimit >= 0 ? saved.bookListLimit : DEFAULT_SETTINGS.bookListLimit,
             bookListSort: saved.bookListSort === 'title' ? 'title' : DEFAULT_SETTINGS.bookListSort,
             bookListDirection: saved.bookListDirection === 'asc' || saved.bookListDirection === 'desc' ? saved.bookListDirection : saved.bookListSort === 'title' ? 'asc' : DEFAULT_SETTINGS.bookListDirection,

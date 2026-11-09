@@ -201,11 +201,11 @@ test('settings disk failure leaves effective settings unchanged and allows retry
 });
 test('library defaults to cursor insertion; closing does not write; overwrite requires confirmation', async t => {
     const h = await harness(t), before = h.files.get(h.target);
-    let modal = openImport(h);
+    let modal = await openImport(h);
     assert.equal(button(modal.modalEl, 'Insert 1 notes').disabled, false);
     modal.close();
     assert.equal(h.state.writes, 0);
-    modal = openImport(h); chooseMode(h, modal, 'overwrite');
+    modal = await openImport(h); chooseMode(h, modal, 'overwrite');
     assert.equal(button(modal.modalEl, 'Replace 1 notes').disabled, true);
     button(modal.modalEl, 'Replace 1 notes').click();
     assert.equal(h.state.writes, 0);
@@ -216,7 +216,7 @@ test('library defaults to cursor insertion; closing does not write; overwrite re
     assert.notEqual(h.files.get(h.target), before);
 });
 test('import double click commits once; failed write retains target and mode; success closes with a notice', async t => {
-    const h = await harness(t), modal = openImport(h), before = h.files.get(h.target);
+    const h = await harness(t), modal = await openImport(h), before = h.files.get(h.target);
     chooseMode(h, modal, 'append'); h.state.failWrite = true;
     button(modal.modalEl, 'Append 1 notes').click();
     await until(() => [...modal.modalEl.querySelectorAll('button')].some(el => el.textContent === 'Append 1 notes' && !el.disabled));
@@ -234,14 +234,15 @@ test('import double click commits once; failed write retains target and mode; su
 });
 test('no active note requires a target; stale cursor is refused with an append recovery action', async t => {
     const h = await harness(t);
-    const empty = openImport(h, null);
+    const empty = await openImport(h, null);
     assert.equal(h.state.writes, 0);
     button(empty.modalEl, 'Choose note').click();
     const picker = [...h.document.querySelectorAll('[role=dialog]')].at(-1);
     picker.querySelector('input').dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
     assert.equal(h.state.writes, 0);
+    await until(() => !button(empty.modalEl, 'Append 1 notes').disabled);
     button(empty.modalEl, 'Append 1 notes').click(); await until(() => h.state.writes === 1);
-    const stale = openImport(h);
+    const stale = await openImport(h);
     h.files.set(h.target, h.files.get(h.target) + 'Concurrent edit.');
     button(stale.modalEl, 'Insert 1 notes').click();
     button(stale.modalEl, 'Import again').click();
@@ -252,7 +253,7 @@ test('no active note requires a target; stale cursor is refused with an append r
     assert.match(h.files.get(h.target), /Concurrent edit/);
 });
 test('changing overwrite target resets confirmation and canceling picker preserves context', async t => {
-    const h = await harness(t), modal = openImport(h);
+    const h = await harness(t), modal = await openImport(h);
     chooseMode(h, modal, 'overwrite');
     button(modal.modalEl, 'More').click(); button(h.document.querySelector('[role=menu]'), 'Change target note').click();
     let picker = [...h.document.querySelectorAll('[role=dialog]')].at(-1);
@@ -264,7 +265,7 @@ test('changing overwrite target resets confirmation and canceling picker preserv
     search.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
     assert.match(modal.contentEl.textContent, /Other.md/);
     assert.equal(modal.contentEl.querySelector('.moonreader-confirmation').hidden, true);
-    assert.equal(button(modal.modalEl, 'Append 1 notes').disabled, false);
+    await until(() => !button(modal.modalEl, 'Append 1 notes').disabled);
     assert.equal(h.state.writes, 0);
 });
 test('preview ignores stale async renders and closing disposes its components', async t => {
@@ -318,7 +319,7 @@ test('testing saved credentials uses keychain and surfaces access failures witho
 });
 
 test('selection and search update the preview in the same dialog and no matches disables insertion', async t => {
-    const h = await harness(t), modal = openImport(h);
+    const h = await harness(t), modal = await openImport(h);
     h.plugin.cache.books = [book, { ...book, fileHref: 'https://fixture.test/other.an', bookName: 'Second book', notes: [{ ...book.notes[0], highlightText: 'Second highlight' }] }];
     h.plugin.notify();
     const first = modal.contentEl.querySelector('[role=option]'); first.focus();
@@ -333,13 +334,14 @@ test('selection and search update the preview in the same dialog and no matches 
     assert.equal(button(modal.modalEl, 'Insert 0 notes').disabled, true);
     assert.equal(modal.contentEl.querySelector('.moonreader-reading > div').hidden, true);
     change(h, modal.inputEl, 'Synthetic');
+    await until(() => !button(modal.modalEl, 'Insert 1 notes').disabled);
     button(modal.modalEl, 'Insert 1 notes').click();
     assert.equal(h.state.writes, 1);
     assert.equal(modal.modalEl.isConnected, false);
 });
 
 test('refresh without saved credentials reports inline and only settings opens the connection form', async t => {
-    const h = await harness(t), modal = openImport(h);
+    const h = await harness(t), modal = await openImport(h);
     const cache = h.plugin.cache;
     let requests = 0;
     h.host.requestUrl = async () => { requests++; throw new Error('Unexpected request'); };
@@ -355,7 +357,7 @@ test('refresh without saved credentials reports inline and only settings opens t
 });
 
 test('keyboard cannot bypass overwrite confirmation; choosing another book cancels replacement', async t => {
-    const h = await harness(t), modal = openImport(h);
+    const h = await harness(t), modal = await openImport(h);
     chooseMode(h, modal, 'overwrite');
     modal.inputEl.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true }));
     assert.equal(h.state.writes, 0);
@@ -363,11 +365,11 @@ test('keyboard cannot bypass overwrite confirmation; choosing another book cance
     h.plugin.notify();
     modal.contentEl.querySelector('[role=option][title="Second book"]').click();
     assert.equal(modal.contentEl.querySelector('.moonreader-confirmation').hidden, true);
-    assert.equal(button(modal.modalEl, 'Append 1 notes').disabled, false);
+    await until(() => !button(modal.modalEl, 'Append 1 notes').disabled);
 });
 
 test('close waits for the pending write and prevents repeated submission and selection changes', async t => {
-    const h = await harness(t), modal = openImport(h), gate = deferred();
+    const h = await harness(t), modal = await openImport(h), gate = deferred();
     chooseMode(h, modal, 'append'); h.state.beforeWrite = () => gate.promise;
     button(modal.modalEl, 'Append 1 notes').click();
     modal.close();
@@ -381,7 +383,7 @@ test('close waits for the pending write and prevents repeated submission and sel
 });
 
 test('template fields insert into the editor selection and update the actual rendered preview', async t => {
-    const h = await harness(t), modal = openImport(h), editor = modal.contentEl.querySelector('textarea');
+    const h = await harness(t), modal = await openImport(h), editor = modal.contentEl.querySelector('textarea');
     change(h, editor, '{highlightText}'); editor.setSelectionRange(0, editor.value.length);
     const field = modal.contentEl.querySelector('button[aria-label="Book {bookName}"]');
     field.click();
@@ -681,9 +683,9 @@ test('library falls back to an open Markdown note but does not use a closed rece
 
 test('repeated imports require explicit confirmation and keyboard/cancel cannot duplicate content', async t => {
     const h = await harness(t);
-    let modal = openImport(h); chooseMode(h, modal, 'append');
+    let modal = await openImport(h); chooseMode(h, modal, 'append');
     button(modal.modalEl, 'Append 1 notes').click(); await until(() => h.state.writes === 1);
-    modal = openImport(h); chooseMode(h, modal, 'append');
+    modal = await openImport(h); chooseMode(h, modal, 'append');
     assert.match(modal.contentEl.querySelector('.moonreader-warning').textContent, /already imported/);
     button(modal.modalEl, 'Append 1 notes').click();
     modal.inputEl.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
@@ -764,14 +766,14 @@ test('sort menu preserves search and selection, saves both directions and keeps 
     let modal = new h.BookSuggestModal(h.app, h.plugin, h.view, () => {}); modal.open();
     const titles = () => [...modal.contentEl.querySelectorAll('[role=option]')].map(row => row.title);
     change(h, modal.inputEl, 'Book');
-    chooseSort(h, modal, 'Title'); await until(() => h.plugin.settings.bookListSort === 'title');
+    chooseSort(h, modal, 'Title, ascending'); await until(() => h.plugin.settings.bookListSort === 'title');
     assert.deepEqual(titles(), ['Book A', 'Book M', 'Book X', 'Book Z']);
     assert.equal(modal.inputEl.value, 'Book'); assert.equal(modal.contentEl.querySelector('[aria-selected=true]').title, 'Book Z');
-    chooseSort(h, modal, 'Descending'); await until(() => h.plugin.settings.bookListDirection === 'desc');
+    chooseSort(h, modal, 'Title, descending'); await until(() => h.plugin.settings.bookListDirection === 'desc');
     assert.deepEqual(titles(), ['Book Z', 'Book X', 'Book M', 'Book A']);
-    chooseSort(h, modal, 'Modification time'); await until(() => h.plugin.settings.bookListSort === 'backup-date');
+    chooseSort(h, modal, 'Backup date, newest first'); await until(() => h.plugin.settings.bookListSort === 'backup-date');
     assert.deepEqual(titles(), ['Book Z', 'Book A', 'Book M', 'Book X']);
-    chooseSort(h, modal, 'Ascending'); await until(() => h.plugin.settings.bookListDirection === 'asc');
+    chooseSort(h, modal, 'Backup date, oldest first'); await until(() => h.plugin.settings.bookListDirection === 'asc');
     assert.deepEqual(titles(), ['Book A', 'Book Z', 'Book M', 'Book X']);
     await h.plugin.updateSettings({ bookListLimit: 1 }); h.plugin.notify();
     assert.equal(modal.contentEl.querySelector('[aria-selected=true]').title, 'Book A');
@@ -786,7 +788,7 @@ test('sort menu preserves search and selection, saves both directions and keeps 
 test('library hides healthy connection status and shortens the target without hiding replacement details', async t => {
     const h = await harness(t);
     h.target.path = 'Folder/Target.md';
-    const modal = openImport(h);
+    const modal = await openImport(h);
     const destination = modal.contentEl.querySelector('.moonreader-destination > div');
     assert.equal(destination.textContent, 'Target.md'); assert.equal(destination.title, h.target.path);
     assert.ok(destination.getAttribute('aria-label').includes(h.target.path));
@@ -804,19 +806,19 @@ test('list preferences persist, reject invalid limits and recover from a failed 
     const limit = input(tab.containerEl, 'Books shown');
     assert.equal(limit.value, '0');
     change(h, limit, '2'); await until(() => h.plugin.settings.bookListLimit === 2);
-    const modal = openImport(h);
+    const modal = await openImport(h);
     const order = modal.contentEl.querySelector('button[aria-label="Book order"]');
     assert.ok(modal.contentEl.querySelector('.moonreader-sidebar').contains(order));
     assert.ok(order.compareDocumentPosition(modal.contentEl.querySelector('[role=listbox]')) & h.dom.window.Node.DOCUMENT_POSITION_FOLLOWING);
     assert.ok(!tab.containerEl.querySelector('select[aria-label="Book order"]'));
-    chooseSort(h, modal, 'Title'); await until(() => !order.disabled);
+    chooseSort(h, modal, 'Title, ascending'); await until(() => !order.disabled);
     const saved = JSON.parse(await fs.readFile(join(h.vault, h.dir, 'data.json'), 'utf8'));
     assert.equal(saved.bookListLimit, 2); assert.equal(saved.bookListSort, 'title');
     const saves = h.state.saves;
     for (const invalid of ['-1', '1.5', '', '9007199254740992']) change(h, limit, invalid);
     assert.equal(h.state.saves, saves); assert.equal(h.plugin.settings.bookListLimit, 2);
     h.state.beforeSave = async () => { throw new Error('Controlled preference save failure'); };
-    chooseSort(h, modal, 'Modification time'); await until(() => !order.disabled);
+    chooseSort(h, modal, 'Backup date, newest first'); await until(() => !order.disabled);
     assert.equal(order.textContent, 'Title ↑'); assert.equal(h.plugin.settings.bookListSort, 'title');
     change(h, limit, '3'); await until(() => limit.value === '2');
     assert.equal(h.plugin.settings.bookListLimit, 2);
@@ -1225,7 +1227,7 @@ test('refresh listing and download timeouts retain notes, release the lock and i
 });
 
 test('closing the captured Markdown view refuses cursor insertion and allows explicit append recovery', async t => {
-    const h = await harness(t), modal = openImport(h), before = h.files.get(h.target);
+    const h = await harness(t), modal = await openImport(h), before = h.files.get(h.target);
     h.app.workspace.getLeavesOfType = () => [];
     button(modal.contentEl, 'Insert 1 notes').click();
     await until(() => !modal.panel.busy);
@@ -1280,7 +1282,7 @@ test('older default-mode failures cannot undo a later successful choice', async 
 });
 
 test('a failed import catches up deferred cache, selection and preference changes before retry', async t => {
-    const h = await harness(t), modal = openImport(h), gate = deferred();
+    const h = await harness(t), modal = await openImport(h), gate = deferred();
     chooseMode(h, modal, 'append'); h.state.beforeWrite = () => gate.promise;
     button(modal.contentEl, 'Append 1 notes').click(); await until(() => modal.panel.busy);
     h.plugin.cache.books = [{ ...book, fileHref: 'https://fixture.test/dav/replacement.an', bookName: 'Replacement book', notes: [{ ...book.notes[0], highlightText: 'New highlight' }] }];
@@ -1298,7 +1300,7 @@ test('a failed import catches up deferred cache, selection and preference change
 
 test('an import records the source captured before a concurrent cache switch', async t => {
     const h = await harness(t); h.plugin.cache.source = 'old-source';
-    const modal = openImport(h), gate = deferred(); chooseMode(h, modal, 'append'); h.state.beforeWrite = () => gate.promise;
+    const modal = await openImport(h), gate = deferred(); chooseMode(h, modal, 'append'); h.state.beforeWrite = () => gate.promise;
     button(modal.contentEl, 'Append 1 notes').click(); await until(() => modal.panel.busy);
     h.plugin.cache = { ...h.plugin.cache, source: 'new-source', books: [] }; h.plugin.notify();
     gate.resolve(); await until(() => !modal.panel.busy);
@@ -1332,4 +1334,96 @@ test('reopening during a committed connection write stays disabled and then show
     assert.equal(input(tab.containerEl, 'WebDAV folder URL').disabled, false);
     assert.equal(tab.containerEl.querySelector('.moonreader-keychain select').value, h.plugin.settings.secretId);
     tab.hide();
+});
+
+test('default orders drive the library, bounded and full previews, and complete import', async t => {
+    const h = await harness(t), tab = settings(h);
+    const pref = label => tab.containerEl.querySelector('select[aria-label^="' + label + '"]');
+    change(h, pref('Default book order'), 'title/desc', 'change');
+    await until(() => h.plugin.settings.bookListSort === 'title');
+    change(h, pref('Default note order'), 'chapter-asc', 'change');
+    await until(() => h.plugin.settings.noteOrder === 'chapter-asc');
+    const notes = [['X', '10', ''], ['B', '2', '2026-01-01'], ['C', '2', '2026-01-01'], ['A', '1', '2026-02-01']]
+        .map(([highlightText, chapter, timestamp]) => ({ ...book.notes[0], highlightText, chapter, timestamp }));
+    h.plugin.cache.books = [{ ...book, notes }];
+    await h.plugin.updateSettings({ noteTemplate: '{highlightText}' });
+    const modal = new h.BookSuggestModal(h.app, h.plugin, h.view, () => {}); modal.open();
+    const preview = () => modal.contentEl.querySelector('.moonreader-book-preview').textContent;
+    await until(() => preview() === 'ABC');
+    assert.equal(modal.contentEl.querySelector('[aria-label="Book order"]').textContent, 'Title ↓');
+    button(modal.contentEl, 'Preview all 4 notes').click();
+    await until(() => preview() === 'ABCX');
+    const order = modal.contentEl.querySelector('select[aria-label="Note order"]');
+    change(h, order, 'time-asc', 'change');
+    await until(() => preview() === 'BCAX');
+    change(h, order, 'time-desc', 'change');
+    await until(() => preview() === 'ABCX');
+    button(modal.contentEl, 'Show first 3').click();
+    await until(() => preview() === 'ABC');
+    assert.equal(pref('Default note order').value, 'time-desc');
+    assert.equal(notes.map(n => n.highlightText).join(''), 'XBCA');
+    button(modal.contentEl, 'Insert 4 notes').click();
+    await until(() => h.state.writes === 1);
+    assert.ok(h.files.get(h.target).endsWith('ABCX'));
+    tab.hide();
+});
+
+test('sorting and pending preview block every write entry until the selected order is visible', async t => {
+    for (const replace of [false, true]) {
+        const h = await harness(t);
+        const modal = await openImport(h);
+        h.plugin.cache.books = [{ ...book, notes: ['A', 'B', 'C', 'D'].map((highlightText, index) =>
+            ({ ...book.notes[0], highlightText, chapter: String(4 - index) })) }];
+        change(h, modal.contentEl.querySelector('textarea'), '{highlightText}');
+        h.plugin.notify();
+        const preview = modal.contentEl.querySelector('.moonreader-book-preview');
+        await until(() => preview.textContent === 'ABC');
+        if (replace) chooseMode(h, modal, 'overwrite');
+        const action = button(modal.contentEl, replace ? 'Confirm replacement' : 'Insert 4 notes');
+        const save = deferred(), render = deferred();
+        h.state.beforeSave = () => save.promise;
+        const original = h.host.MarkdownRenderer.render;
+        h.host.MarkdownRenderer.render = async (...args) => { await render.promise; return original(...args); };
+        change(h, modal.contentEl.querySelector('[aria-label="Note order"]'), 'chapter-asc', 'change');
+        const checkBlocked = () => {
+            assert.equal(action.disabled, true); action.click();
+            modal.inputEl.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+            assert.equal(h.state.writes, 0);
+        };
+        checkBlocked();
+        save.resolve();
+        await until(() => h.plugin.settings.noteOrder === 'chapter-asc');
+        assert.equal(preview.textContent, 'ABC');
+        checkBlocked(); render.resolve();
+        await until(() => !action.disabled);
+        assert.equal(preview.textContent, 'DCB');
+        action.click(); await until(() => h.state.writes === 1);
+        assert.ok(h.files.get(h.target).endsWith('DCBA'));
+    }
+});
+
+test('expanded preview skips same-book searches and coalesces template edits', async t => {
+    const h = await harness(t), modal = await openImport(h);
+    h.plugin.cache.books = [{ ...book, notes: Array(120).fill(book.notes[0]) }]; h.plugin.notify();
+    button(modal.contentEl, 'Preview all 120 notes').click();
+    await until(() => modal.contentEl.querySelectorAll('.moonreader-book-preview blockquote').length === 240);
+    let renders = 0;
+    const original = h.host.MarkdownRenderer.render;
+    h.host.MarkdownRenderer.render = (...args) => { renders++; return original(...args); };
+    for (const query of ['S', 'Sy', 'Syn']) change(h, modal.inputEl, query);
+    assert.equal(renders, 0);
+    const editor = modal.contentEl.querySelector('textarea');
+    for (const template of ['1', '12', '123']) change(h, editor, template);
+    assert.equal(button(modal.contentEl, 'Insert 120 notes').disabled, true);
+    await until(() => modal.contentEl.querySelector('.moonreader-book-preview').textContent === '123'.repeat(120));
+    assert.equal(renders, 1);
+    assert.equal(button(modal.contentEl, 'Insert 120 notes').disabled, false);
+    h.state.beforeSave = async () => { throw new Error('Controlled save failure'); };
+    const order = modal.contentEl.querySelector('[aria-label="Note order"]');
+    change(h, order, 'chapter-desc', 'change');
+    await until(() => !order.disabled);
+    assert.equal(order.value, 'backup');
+    assert.match(modal.contentEl.querySelector('.moonreader-preview-toolbar').textContent, /Order was not saved.*Backup order/);
+    assert.equal(button(modal.contentEl, 'Insert 120 notes').disabled, false);
+    modal.close();
 });

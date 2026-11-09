@@ -1,5 +1,17 @@
 import type { MoonReaderNote } from './anParser';
 
+import type { NoteOrder } from '../settings';
+
+export function orderedNotes(notes: MoonReaderNote[], order: NoteOrder): MoonReaderNote[] {
+    if (order === 'backup') return notes;
+    const direction = order.endsWith('-asc') ? 1 : -1;
+    if (order.startsWith('chapter')) return [...notes].sort((a, b) => direction * (Number(a.chapter) - Number(b.chapter)));
+    return [...notes].sort((a, b) => {
+        if (!a.timestamp || !b.timestamp) return Number(!a.timestamp) - Number(!b.timestamp);
+        return direction * a.timestamp.localeCompare(b.timestamp);
+    });
+}
+
 export interface BookItem {
     fileHref: string;
     bookName: string;

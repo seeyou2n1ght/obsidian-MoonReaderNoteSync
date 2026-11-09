@@ -2,6 +2,7 @@ import { App, ButtonComponent, Component, DropdownComponent, PluginSettingTab, S
 import type MoonReaderSyncPlugin from '../main';
 import { normalizeWebDavUrl, WebDAVClient } from '../utils/webdav';
 import { NotePreview, TemplateBuilderUI } from './templateBuilder';
+import { sortPreference } from './sortPreference';
 import { t, errorMessage, UserError } from '../i18n';
 
 export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
@@ -299,6 +300,10 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
         }
         definitions.push({ type: 'group', cls: 'moonreader-settings', heading: t('书库显示', 'Library display'), items: [
             { name: t('阅读笔记', 'Reading notes'), desc: t('浏览缓存书籍并插入当前笔记。', 'Browse cached books and insert into the current note.'), render: setting => { setting.addButton(button => button.setButtonText(t('浏览书籍', 'Browse books')).onClick(() => this.browse())); } },
+            { name: t('默认书籍排序', 'Default book order'), desc: t('在书库中更改也会更新此默认值。', 'Changing this in the library also updates the default.'), render: setting => {
+                const feedback = setting.descEl.createDiv({ attr: { role: 'status' } });
+                setting.addDropdown(dropdown => sortPreference(this.plugin, ensureOwner(), dropdown, 'book', feedback));
+            } },
             { name: t('显示书籍数量', 'Books shown'), desc: t('0 表示全部。先搜索和排序，再限制显示数量；不影响备份下载。', '0 shows all books. Search and sort are applied before this limit; downloads are unaffected.'), render: setting => {
                 const feedback = setting.descEl.createDiv({ cls: 'moonreader-preference-feedback', attr: { role: 'status', 'aria-live': 'polite' } });
                 let editRevision = 0;
@@ -319,6 +324,10 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
             } },
         ] });
         definitions.push({ type: 'group', cls: 'moonreader-settings', heading: t('导入方式', 'Note insertion'), items: [
+            { name: t('默认笔记排序', 'Default note order'), desc: t('在书库中更改也会更新此默认值。', 'Changing this in the library also updates the default.'), render: setting => {
+                const feedback = setting.descEl.createDiv({ attr: { role: 'status' } });
+                setting.addDropdown(dropdown => sortPreference(this.plugin, ensureOwner(), dropdown, 'note', feedback));
+            } },
             { name: t('默认写入方式', 'Default import mode'), desc: t('每次导入都会展示目标。替换正文始终需要确认。', 'Every import shows its destination. Replacing the body always requires confirmation.'), render: setting => {
                 const feedback = setting.descEl.createDiv({ cls: 'moonreader-preference-feedback', attr: { role: 'status', 'aria-live': 'polite' } });
                 let editRevision = 0;

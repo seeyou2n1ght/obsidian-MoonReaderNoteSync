@@ -1,6 +1,7 @@
 import { App, ButtonComponent, Component, MarkdownView, Menu, Modal } from 'obsidian';
 import type MoonReaderSyncPlugin from '../main';
 import type { BookItem } from '../utils/notes';
+import { bookOrderOptions } from './sortPreference';
 import { ImportPanel } from './importPanel';
 import { t, errorMessage } from '../i18n';
 
@@ -71,6 +72,7 @@ export class BookSuggestModal extends Modal {
         let books = this.plugin.cache.books;
         let limit = this.plugin.settings.bookListLimit;
         let sort = this.plugin.settings.bookListSort;
+        let noteOrder = this.plugin.settings.noteOrder;
         let direction = this.plugin.settings.bookListDirection;
         const update = this.updateLibrary = () => {
             this.status.setText(this.plugin.status);
@@ -78,7 +80,8 @@ export class BookSuggestModal extends Modal {
             this.connectionStatus.hidden = this.plugin.configured();
             this.updateOrderButton();
             this.refreshButton.setDisabled(this.plugin.syncing || this.plugin.connectionSaving || this.panel.busy);
-            if (!this.panel.busy && (books !== this.plugin.cache.books || limit !== this.plugin.settings.bookListLimit || sort !== this.plugin.settings.bookListSort || direction !== this.plugin.settings.bookListDirection)) {
+            if (!this.panel.busy && (noteOrder !== this.plugin.settings.noteOrder || books !== this.plugin.cache.books || limit !== this.plugin.settings.bookListLimit || sort !== this.plugin.settings.bookListSort || direction !== this.plugin.settings.bookListDirection)) {
+                noteOrder = this.plugin.settings.noteOrder;
                 books = this.plugin.cache.books; limit = this.plugin.settings.bookListLimit; sort = this.plugin.settings.bookListSort; direction = this.plugin.settings.bookListDirection; this.renderBooks(true);
             }
         };
@@ -102,14 +105,11 @@ export class BookSuggestModal extends Modal {
         if (this.disposed || this.panel.busy || this.savingOrder) return;
         this.orderMenu?.hide();
         const menu = this.orderMenu = new Menu();
-        for (const [sort, label] of [['backup-date', t('修改时间', 'Modification time')], ['title', t('书名', 'Title')]] as const) {
-            menu.addItem(item => item.setTitle(label).setChecked(this.plugin.settings.bookListSort === sort).onClick(() => {
-                if (this.plugin.settings.bookListSort !== sort) void this.saveOrder(sort, sort === 'title' ? 'asc' : 'desc');
+        for (const [sort, direction, label] of bookOrderOptions()) {
+            const selected = this.plugin.settings.bookListSort === sort && this.plugin.settings.bookListDirection === direction;
+            menu.addItem(item => item.setTitle(label).setChecked(selected).onClick(() => {
+                if (!selected) void this.saveOrder(sort, direction);
             }));
-        }
-        menu.addSeparator();
-        for (const [direction, label] of [['asc', t('升序', 'Ascending')], ['desc', t('降序', 'Descending')]] as const) {
-            menu.addItem(item => item.setTitle(label).setChecked(this.plugin.settings.bookListDirection === direction).onClick(() => { void this.saveOrder(this.plugin.settings.bookListSort, direction); }));
         }
         const rect = this.bookOrder.buttonEl.getBoundingClientRect(); menu.showAtPosition({ x: rect.left, y: rect.bottom });
     }

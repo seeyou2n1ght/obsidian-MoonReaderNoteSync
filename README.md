@@ -41,7 +41,9 @@ Each WebDAV request times out after 30 seconds, including folder listings and an
 
 ### Import notes
 
-Select a book to preview its first three annotations. The import button writes **all annotations** from that book; the footer shows the destination and insertion mode.
+Choose the default book and note orders in settings. Changing either order in the library also saves that preference. Notes can follow backup order, chapter number, or annotation time in either direction for chapters and times. Ties retain backup order, and missing times appear last when sorting by time.
+
+Select a book to preview its first three sorted annotations. Choose **Preview all** to expand the full preview. Use the preview toolbar to change order, show the first three again, or adjust the template. After changing order or template, wait for the updated preview before importing. The import button writes **all annotations** from that book; the footer shows the destination and insertion mode.
 
 - The default inserts at the cursor captured when the panel opened, without replacing selected text. If another pane has focus, it uses the most recent Markdown note still open.
 - With no open destination, use **Choose note**, select a Markdown file, then append.

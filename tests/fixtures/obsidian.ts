@@ -18,11 +18,13 @@ HTMLElement.prototype.setText = function(text) { this.textContent = text; };
 export const getLanguage = () => new URLSearchParams(location.search).get('lang') || 'zh';
 export const normalizePath = (path: string) => path.replaceAll('\\', '/');
 export class Component {
+    private cleanups: (() => void)[] = [];
+    register(cleanup: () => void) { this.cleanups.push(cleanup); }
     children: Component[] = []; loaded = false;
     addChild<T extends Component>(child: T): T { this.children.push(child); if (this.loaded) child.load(); return child; }
     removeChild(child: Component) { child.unload(); this.children = this.children.filter(c => c !== child); }
     load() { this.loaded = true; (this as any).onload?.(); this.children.forEach(c => { if (!c.loaded) c.load(); }); }
-    unload() { this.loaded = false; this.children.forEach(c => c.unload()); (this as any).onunload?.(); }
+    unload() { this.loaded = false; this.children.forEach(c => c.unload()); (this as any).onunload?.(); this.cleanups.splice(0).forEach(fn => fn()); }
 }
 export class Modal {
     modalEl = document.createElement('section');

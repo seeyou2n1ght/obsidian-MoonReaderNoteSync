@@ -106,10 +106,10 @@ export async function until(predicate) {
     assert.fail('Timed out waiting for the expected state');
 }
 export function deferred() { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; }
-export function openImport(h, view = h.view) {
+export async function openImport(h, view = h.view) {
     h.plugin.cache.books = [book];
     const modal = new h.BookSuggestModal(h.app, h.plugin, view, () => {});
-    modal.open(); return modal;
+    modal.open(); await until(() => modal.contentEl.querySelector('.moonreader-book-preview .markdown-rendered')); return modal;
 }
 export function chooseMode(h, modal, mode) {
     button(modal.modalEl, 'More').click();

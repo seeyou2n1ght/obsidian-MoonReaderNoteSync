@@ -24,8 +24,9 @@
 .moonreader-book-preview { border: 0; padding: 0; margin: 22px 0; }
 .moonreader-preview > :first-child, .moonreader-preview .markdown-rendered > :first-child { margin-top: 0; }
 .moonreader-template-details { margin-top: 24px; }
-.moonreader-template-details summary { color: var(--text-muted); font-size: var(--font-ui-small); text-align: right; }
-.moonreader-template-details[open] summary { margin-bottom: 12px; }
+.moonreader-preview-toolbar { position: sticky; top: 0; z-index: 1; padding: 6px 0; background: var(--background-primary); }
+.moonreader-preview-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.moonreader-preview-controls select { max-width: 100%; }
 .moonreader-template-textarea { width: 100%; min-height: 110px; resize: vertical; font-family: var(--font-monospace); }
 .moonreader-field-hint { margin: 10px 0 6px; }
 .moonreader-fields { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
