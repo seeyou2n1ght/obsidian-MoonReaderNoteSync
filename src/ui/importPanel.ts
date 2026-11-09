@@ -34,11 +34,11 @@ export class ImportPanel extends Component {
     private warning!: HTMLElement;
     private status!: HTMLElement;
     private targetLabel!: HTMLElement;
-    private modeLabel!: HTMLElement;
+    private actions!: HTMLElement;
     private confirmation!: HTMLElement;
     private templateDetails!: HTMLElement;
     private primary!: ButtonComponent;
-    private more!: ButtonComponent;
+    private modeButton!: ButtonComponent;
     private recovery!: ButtonComponent;
     private menu: Menu | null = null;
     private active = false;
@@ -58,13 +58,15 @@ export class ImportPanel extends Component {
     }
     onload() {
         this.active = true;
-        this.heading = this.content.createEl('h3', { cls: 'moonreader-book-title' });
         const toolbar = this.content.createDiv({ cls: 'moonreader-preview-toolbar' });
-        this.meta = toolbar.createDiv({ cls: 'moonreader-meta' });
+        this.heading = toolbar.createEl('h3', { cls: 'moonreader-book-title' });
+        const range = toolbar.createDiv({ cls: 'moonreader-preview-range' });
+        this.meta = range.createDiv({ cls: 'moonreader-meta' });
         const controls = toolbar.createDiv({ cls: 'moonreader-preview-controls' });
-        const dropdown = new DropdownComponent(controls);
+        const orderLabel = controls.createEl('label', { text: t('笔记顺序 ', 'Note order ') });
+        const dropdown = new DropdownComponent(orderLabel);
         dropdown.selectEl.setAttribute('aria-label', t('笔记排序', 'Note order'));
-        this.toggle = new ButtonComponent(controls).onClick(() => {
+        this.toggle = new ButtonComponent(range).onClick(() => {
             this.expanded = !this.expanded; this.updatePreview(false);
         });
         this.templateToggle = new ButtonComponent(controls).setButtonText(t('调整模板', 'Adjust template')).onClick(() => {
@@ -94,11 +96,14 @@ export class ImportPanel extends Component {
         this.recovery = new ButtonComponent(feedback).setButtonText(t('改为文末追加', 'Use append instead')).onClick(() => this.setAction('append'));
         this.recovery.buttonEl.hidden = true;
         this.confirmation = this.footer.createDiv({ cls: 'moonreader-confirmation' });
+        this.confirmation.hidden = true;
         const actions = this.footer.createDiv({ cls: 'moonreader-import-actions' });
+        this.actions = actions;
         const destination = actions.createDiv({ cls: 'moonreader-destination' });
-        this.targetLabel = destination.createDiv();
-        this.modeLabel = destination.createDiv({ cls: 'moonreader-meta' });
-        this.more = new ButtonComponent(actions).setButtonText(t('更多', 'More')).setTooltip(t('更多写入选项', 'More import options')).onClick(() => this.openMenu());
+        destination.createSpan({ text: t('写入到', 'Write to'), cls: 'moonreader-meta' });
+        this.targetLabel = new ButtonComponent(destination).onClick(() => this.chooseTarget()).buttonEl;
+        this.modeButton = new ButtonComponent(actions).setTooltip(t('写入方式', 'Import mode')).onClick(() => this.openMenu());
+        this.modeButton.buttonEl.setAttribute('aria-haspopup', 'menu');
         this.primary = new ButtonComponent(actions).setCta().onClick(() => {
             if (!this.target) this.chooseTarget(); else void this.submit();
         });
@@ -143,11 +148,10 @@ export class ImportPanel extends Component {
         if (contentChanged) this.previewReady = false;
         const count = this.notes.length;
         const visible = this.expanded ? this.notes : this.notes.slice(0, 3);
-        const range = visible.length === count ? t('已全部显示', 'Showing all') : t('预览前 3 条', 'Preview of first 3');
-        const chapterHint = this.lastOrder?.startsWith('chapter') ? t(' · 同章内沿用备份顺序', ' · Backup order within each chapter') : '';
-        this.meta.setText(t('共 ', '') + count + t(' 条笔记 · ', ' notes · ') + range + chapterHint);
+        this.meta.setText(t('预览 ', 'Preview ') + visible.length + ' / ' + count + t(' 条', ' notes'));
+        this.meta.title = this.lastOrder?.startsWith('chapter') ? t('同章内沿用备份顺序', 'Backup order within each chapter') : '';
         this.toggle.buttonEl.hidden = count <= 3;
-        this.toggle.setButtonText(this.expanded ? t('收起至前 3 条', 'Show first 3') : t('查看全部 ', 'Preview all ') + count + t(' 条', ' notes'));
+        this.toggle.setButtonText(this.expanded ? t('收起至前 3 条', 'Show first 3') : t('查看全部', 'Preview all'));
         this.toggle.buttonEl.setAttribute('aria-expanded', String(this.expanded));
         this.previewStatus.setText(t('正在更新预览…', 'Updating preview…'));
         this.updateButton();
@@ -168,10 +172,10 @@ export class ImportPanel extends Component {
         this.warning.setText([this.book?.syncError || '', repeat ? t('本次会话已向此笔记导入过这本书。再次导入可能产生重复内容。', 'This book was already imported into this note during this session. Importing again may duplicate content.') : ''].filter(Boolean).join(' '));
     }
     private updateDestination() {
-        this.targetLabel.setText(this.target ? this.target.path.split('/').pop()! : t('尚未选择目标笔记', 'No target note selected'));
+        this.targetLabel.setText(this.target ? this.target.path : t('尚未选择目标笔记', 'No target note selected'));
         this.targetLabel.title = this.target?.path || '';
         this.targetLabel.setAttribute('aria-label', this.target ? t('写入 ', 'Write to ') + this.target.path : t('尚未选择目标笔记', 'No target note selected'));
-        this.modeLabel.setText(!this.target ? t('没有可用的已打开笔记，选择后追加到文末', 'No open note is available; choose one to append to its end') : this.action === 'cursor' ? t('打开面板时记录的笔记光标处', 'Cursor captured when the panel opened') : this.action === 'append' ? t('文末追加', 'Append to end') : t('替换正文 · 保留 YAML 属性', 'Replace body · Preserve YAML properties'));
+        this.modeButton.setButtonText((this.action === 'cursor' ? t('光标处插入', 'At cursor') : this.action === 'append' ? t('文末追加', 'Append to end') : t('替换正文', 'Replace body')) + ' ▾');
     }
     private get writeBlocked() {
         return this.busy || this.completed || this.orderSaving || !this.previewReady || !this.notes.length || !this.template.trim();
@@ -179,13 +183,17 @@ export class ImportPanel extends Component {
     private updateButton() {
         const count = this.book?.notes.length || 0;
         this.primary.setButtonText(this.busy ? t('正在写入…', 'Writing…') : !this.target ? t('选择笔记', 'Choose note') :
-            (this.action === 'cursor' ? t('插入 ', 'Insert ') : this.action === 'append' ? t('追加 ', 'Append ') : t('替换 ', 'Replace ')) + count + t(' 条', ' notes'));
+            (this.action === 'cursor' ? t('插入全部 ', 'Insert all ') : this.action === 'append' ? t('追加全部 ', 'Append all ') : t('替换全部 ', 'Replace all ')) + count + t(' 条', count === 1 ? ' note' : ' notes'));
+        this.actions.hidden = !this.confirmation.hidden;
         this.primary.setDisabled(this.writeBlocked || this.action === 'overwrite' || this.repeatConfirmation);
-        this.more.setDisabled(this.busy || !count);
+        this.modeButton.setDisabled(this.busy || !count);
         const confirm = this.confirmation.querySelector<HTMLButtonElement>('.mod-cta');
         if (confirm) confirm.disabled = this.writeBlocked;
     }
-    focusPrimary() { this.primary.buttonEl.focus(); }
+    focusPrimary() {
+        if (this.confirmation.hidden) this.primary.buttonEl.focus();
+        else this.confirmation.querySelector('button')?.focus();
+    }
     private setAction(action: ImportAction) {
         if (this.busy) return;
         this.action = action;
@@ -196,8 +204,8 @@ export class ImportPanel extends Component {
             this.confirmation.hidden = false;
             this.confirmation.createEl('p', { text: t('将替换 ', 'Replace the body of ') + this.target.path + t(' 的正文，保留 YAML 属性。', ', preserving YAML properties.') });
             new ButtonComponent(this.confirmation).setButtonText(t('取消', 'Cancel')).onClick(() => this.setAction(this.target === this.originalFile ? 'cursor' : 'append'));
-            new ButtonComponent(this.confirmation).setCta().setButtonText(t('确认替换', 'Confirm replacement')).onClick(() => { void this.submit(true); });
-            this.updateButton();
+            new ButtonComponent(this.confirmation).setCta().setButtonText(t('确认替换', 'Confirm replacement')).onClick(() => { void this.submit(true); }).buttonEl.addClass('mod-warning');
+            this.updateButton(); this.focusPrimary();
         }
     }
     private openMenu() {
@@ -207,10 +215,9 @@ export class ImportPanel extends Component {
         menu.addItem(item => item.setTitle(t('插入光标处', 'Insert at cursor')).setIcon('text-cursor-input').setChecked(this.action === 'cursor')
             .setDisabled(!this.target || this.target !== this.originalFile || this.view?.file !== this.originalFile).onClick(() => this.setAction('cursor')));
         menu.addItem(item => item.setTitle(t('追加到文末', 'Append to end')).setIcon('text-cursor').setChecked(this.action === 'append').onClick(() => this.setAction('append')));
-        menu.addItem(item => item.setTitle(t('更换目标笔记', 'Change target note')).setIcon('file-input').onClick(() => this.chooseTarget()));
         menu.addSeparator();
         menu.addItem(item => item.setTitle(t('替换正文…', 'Replace body…')).setIcon('replace').setDisabled(!this.target).onClick(() => this.setAction('overwrite')));
-        const rect = this.more.buttonEl.getBoundingClientRect();
+        const rect = this.modeButton.buttonEl.getBoundingClientRect();
         menu.showAtPosition({ x: rect.left, y: rect.bottom });
     }
     private chooseTarget() {
@@ -236,7 +243,7 @@ export class ImportPanel extends Component {
             this.confirmation.createEl('p', { text: t('已导入过这本书，是否仍要再次写入 ', 'This book was already imported. Write it again to ') + this.target.path + '?' });
             new ButtonComponent(this.confirmation).setButtonText(t('取消', 'Cancel')).onClick(() => this.setAction(this.action));
             new ButtonComponent(this.confirmation).setCta().setButtonText(t('仍然导入', 'Import again')).onClick(() => { void this.submit(false, true); });
-            this.updateButton(); return;
+            this.updateButton(); this.focusPrimary(); return;
         }
         const target = this.target, action = this.action, book = this.book;
         const importKey = this.importKey();

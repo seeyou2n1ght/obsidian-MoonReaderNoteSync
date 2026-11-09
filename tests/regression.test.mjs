@@ -74,6 +74,10 @@ test('append and replacement preserve intended content and YAML edge cases', () 
     assert.equal(mergeNote('', 'new', 'append'), 'new');
     assert.equal(mergeNote('---\r\ntitle: T\r\n---\r\nold', 'new', 'overwrite'), '---\r\ntitle: T\r\n---\r\nnew');
     assert.equal(mergeNote('\uFEFF---\na: 1\n---', 'new', 'overwrite'), '\uFEFF---\na: 1\n---\nnew');
+    for (const eol of ['\n', '\r\n']) {
+        const header = '\uFEFF---' + eol + '---' + eol;
+        assert.equal(mergeNote(header + 'old' + eol + '---' + eol + 'later', 'new', 'overwrite'), header + 'new');
+    }
     assert.equal(mergeNote('plain body', 'new', 'overwrite'), 'new');
 });
 test('failed refresh retains old notes and metadata and retries even when metadata matches', async () => {

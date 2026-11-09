@@ -201,6 +201,18 @@ export class MoonReaderWebDAVSettingTab extends PluginSettingTab {
                 controls.clear();
                 setting.settingEl.parentElement?.addClass('moonreader-connection-card');
                 setting.settingEl.parentElement?.parentElement?.addClass('moonreader-connection-group');
+                const card = setting.settingEl.parentElement;
+                if (!this.connectionOnly && card?.parentElement && this.plugin.configured() && !card.closest('.moonreader-saved-connection')) {
+                    const disclosure = card.parentElement.createEl('details', { cls: 'moonreader-saved-connection' });
+                    card.before(disclosure);
+                    const summary = disclosure.createEl('summary');
+                    const updateSummary = () => summary.setText(t('备份连接 · ', 'Backup connection · ') +
+                        serverOrigin(this.plugin.settings.webDavUrl) + ' · ' + this.plugin.settings.username);
+                    updateSummary();
+                    this.plugin.listeners.add(updateSummary);
+                    currentOwner.register(() => this.plugin.listeners.delete(updateSummary));
+                    disclosure.appendChild(card);
+                }
                 setting.settingEl.addClass('moonreader-connection-field');
                 setting.addText(text => { urlInput = text.inputEl; controls.add(text.inputEl); text.setValue(url).setPlaceholder('https://…/dav/Books/.Notes/').onChange(value => {
                     const changedServer = serverOrigin(value) !== serverOrigin(url);

@@ -112,7 +112,7 @@ export async function openImport(h, view = h.view) {
     modal.open(); await until(() => modal.contentEl.querySelector('.moonreader-book-preview .markdown-rendered')); return modal;
 }
 export function chooseMode(h, modal, mode) {
-    button(modal.modalEl, 'More').click();
+    modal.modalEl.querySelector('button[aria-label="Import mode"]').click();
     button(h.document.querySelector('[role=menu]'), { cursor: 'Insert at cursor', append: 'Append to end', overwrite: 'Replace body…' }[mode]).click();
 }
 export function chooseSort(h, modal, label) {

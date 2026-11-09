@@ -37,6 +37,6 @@ export function renderNotes(notes: MoonReaderNote[], template: string): string {
 
 export function mergeNote(content: string, text: string, action: 'append' | 'overwrite'): string {
     if (action === 'append') return content + (content && !content.endsWith('\n') ? '\n' : '') + text;
-    const frontmatter = content.match(/^(?:\uFEFF)?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/)?.[0] || '';
+    const frontmatter = content.match(/^(?:\uFEFF)?---\r?\n(?:[^\n]*\n)*?---(?:\r?\n|$)/)?.[0] || '';
     return frontmatter + (frontmatter && !frontmatter.endsWith('\n') ? '\n' : '') + text;
 }

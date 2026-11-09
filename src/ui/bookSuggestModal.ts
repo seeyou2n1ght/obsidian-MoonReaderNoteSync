@@ -10,6 +10,9 @@ export class BookSuggestModal extends Modal {
     private owner = new Component();
     private panel!: ImportPanel;
     private list!: HTMLElement;
+    private workspace!: HTMLElement;
+    private switchBook!: ButtonComponent;
+    private failureDetails!: ButtonComponent;
     private listCount!: HTMLElement;
     private bookOrder!: ButtonComponent;
     private orderMenu: Menu | null = null;
@@ -17,10 +20,15 @@ export class BookSuggestModal extends Modal {
     private reading!: HTMLElement;
     private empty!: HTMLElement;
     private status!: HTMLElement;
-    private connectionStatus!: HTMLElement;
+    private sourceDetails!: HTMLDetailsElement;
+    private server!: HTMLElement;
+    private detailText!: HTMLElement;
+    private progress!: HTMLProgressElement;
     private refreshButton!: ButtonComponent;
     private settingsButton!: ButtonComponent;
     private selected: string | null = null;
+    private needsSelection = false;
+    private selectedRow: HTMLButtonElement | null = null;
     private shownBooks: BookItem[] = [];
     private unsubscribe = () => {};
     private updateLibrary = () => {};
@@ -34,11 +42,30 @@ export class BookSuggestModal extends Modal {
         this.modalEl.addClass('moonreader-library');
         this.owner.load();
         const toolbar = this.contentEl.createDiv({ cls: 'moonreader-library-toolbar' });
+        this.sourceDetails = toolbar.createEl('details', { cls: 'moonreader-source' });
+        this.server = this.sourceDetails.createEl('summary');
+        this.detailText = this.sourceDetails.createDiv({ cls: 'moonreader-source-info' });
         this.status = toolbar.createDiv({ cls: 'moonreader-meta', attr: { role: 'status', 'aria-live': 'polite' } });
-        this.refreshButton = new ButtonComponent(toolbar).setIcon('refresh-cw').setTooltip(t('刷新书库', 'Refresh library')).onClick(() => { void this.plugin.refresh(); });
+        this.failureDetails = new ButtonComponent(toolbar).onClick(() => {
+            this.sourceDetails.open = !this.sourceDetails.open;
+            this.failureDetails.buttonEl.setAttribute('aria-expanded', String(this.sourceDetails.open));
+        });
+        this.failureDetails.buttonEl.setAttribute('aria-expanded', 'false');
+        this.sourceDetails.addEventListener('toggle', () => this.failureDetails.buttonEl.setAttribute('aria-expanded', String(this.sourceDetails.open)));
+        this.refreshButton = new ButtonComponent(toolbar).onClick(() => {
+            if (!this.plugin.configured() || this.plugin.libraryPhase === 'auth') this.plugin.openConnectionSettings();
+            else void this.plugin.refresh();
+        });
         this.settingsButton = new ButtonComponent(toolbar).setIcon('settings').setTooltip(t('连接设置', 'Connection settings')).onClick(() => this.plugin.openConnectionSettings());
-        this.connectionStatus = this.contentEl.createDiv({ cls: 'moonreader-connection-status', attr: { role: 'status', 'aria-live': 'polite' } });
+        this.progress = this.contentEl.createEl('progress', { cls: 'moonreader-check-progress', attr: { 'aria-label': t('书库检查进度', 'Library check progress') } });
         const workspace = this.contentEl.createDiv({ cls: 'moonreader-workspace' });
+        this.workspace = workspace;
+        this.switchBook = new ButtonComponent(workspace).onClick(() => {
+            const open = workspace.dataset.picker !== 'open';
+            this.setPicker(open);
+            if (open) this.inputEl.focus();
+        });
+        this.switchBook.buttonEl.addClass('moonreader-switch-book');
         const sidebar = workspace.createDiv({ cls: 'moonreader-sidebar' });
         this.inputEl = sidebar.createEl('input', { attr: { type: 'search', placeholder: t('搜索书籍…', 'Search books…'), 'aria-label': t('搜索书籍', 'Search books') } });
         const order = sidebar.createDiv({ cls: 'moonreader-list-order' });
@@ -55,7 +82,11 @@ export class BookSuggestModal extends Modal {
             if (!this.panel.busy) this.updateLibrary();
             if (this.closeRequested && !this.panel.busy) this.close();
         }));
-        this.inputEl.addEventListener('input', () => { if (!this.panel.busy) this.renderBooks(); });
+        this.inputEl.addEventListener('input', () => {
+            if (this.panel.busy) return;
+            this.needsSelection = false;
+            this.renderBooks();
+        });
         this.modalEl.addEventListener('keydown', event => {
             if (event.key === 'Escape' && (this.panel.busy || this.panel.dismissSecondary())) {
                 event.preventDefault(); event.stopImmediatePropagation(); return;
@@ -66,7 +97,7 @@ export class BookSuggestModal extends Modal {
             if (event.target === this.inputEl || this.list.contains(event.target as Node)) {
                 if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                     event.preventDefault(); this.moveSelection(event.key === 'ArrowDown' ? 1 : -1);
-                } else if (event.key === 'Enter') { event.preventDefault(); this.panel.focusPrimary(); }
+                } else if (event.key === 'Enter' && this.selected) { event.preventDefault(); this.setPicker(false); this.panel.focusPrimary(); }
             }
         }, true);
         let books = this.plugin.cache.books;
@@ -75,19 +106,69 @@ export class BookSuggestModal extends Modal {
         let noteOrder = this.plugin.settings.noteOrder;
         let direction = this.plugin.settings.bookListDirection;
         const update = this.updateLibrary = () => {
-            this.status.setText(this.plugin.status);
-            this.connectionStatus.setText(this.plugin.connectionStatus());
-            this.connectionStatus.hidden = this.plugin.configured();
+            this.updateConnectionBar();
             this.updateOrderButton();
             this.refreshButton.setDisabled(this.plugin.syncing || this.plugin.connectionSaving || this.panel.busy);
-            if (!this.panel.busy && (noteOrder !== this.plugin.settings.noteOrder || books !== this.plugin.cache.books || limit !== this.plugin.settings.bookListLimit || sort !== this.plugin.settings.bookListSort || direction !== this.plugin.settings.bookListDirection)) {
-                noteOrder = this.plugin.settings.noteOrder;
-                books = this.plugin.cache.books; limit = this.plugin.settings.bookListLimit; sort = this.plugin.settings.bookListSort; direction = this.plugin.settings.bookListDirection; this.renderBooks(true);
+            if (this.panel.busy) return;
+            const cacheChanged = books !== this.plugin.cache.books;
+            if (cacheChanged || limit !== this.plugin.settings.bookListLimit || sort !== this.plugin.settings.bookListSort || direction !== this.plugin.settings.bookListDirection) {
+                books = this.plugin.cache.books; limit = this.plugin.settings.bookListLimit;
+                sort = this.plugin.settings.bookListSort; direction = this.plugin.settings.bookListDirection;
+                this.renderBooks(true, cacheChanged);
+            } else if (noteOrder !== this.plugin.settings.noteOrder) {
+                this.panel.setBook(this.shownBooks.find(book => book.fileHref === this.selected) || null, true);
             }
+            noteOrder = this.plugin.settings.noteOrder;
         };
         this.plugin.listeners.add(update);
         this.unsubscribe = () => this.plugin.listeners.delete(update);
-        this.renderBooks(); update(); this.inputEl.focus();
+        this.renderBooks(); update(); this.focusLibrary();
+    }
+    focusLibrary() {
+        if (this.switchBook.buttonEl.offsetWidth && this.workspace.dataset.picker !== 'open') this.switchBook.buttonEl.focus();
+        else this.inputEl.focus();
+    }
+    private setPicker(open: boolean) {
+        this.workspace.dataset.picker = open ? 'open' : 'closed';
+        this.switchBook.buttonEl.setAttribute('aria-expanded', String(open));
+    }
+    private updateConnectionBar() {
+        const { cache, libraryPhase: phase, checkProgress, syncing, settings } = this.plugin;
+        const configured = syncing || this.plugin.configured();
+        let url: URL | undefined;
+        try { url = new URL(settings.webDavUrl); } catch { /* Invalid saved address can be corrected in settings. */ }
+        this.sourceDetails.hidden = !settings.username || !url;
+        this.server.setText(url?.host || '');
+        const last = new Date(this.plugin.lastChecked || cache.checkedAt);
+        const checked = Number.isFinite(last.getTime()) ? t('上次检查 ', 'Last checked ') + last.toLocaleString(t('zh-CN', 'en'), { dateStyle: 'short', timeStyle: 'short' }) : t('尚未检查', 'Not checked yet');
+        this.detailText.setText([url?.host, url?.pathname, checked, this.plugin.status].filter(Boolean).join('\n'));
+        const setup = !configured || phase === 'auth';
+        const retry = phase === 'partial' || phase === 'error';
+        const action = !configured && !settings.secretId ? t('连接备份', 'Connect backup') : setup ? t('检查凭据', 'Check credentials') :
+            syncing ? t('检查中', 'Checking') : retry ? t('重试', 'Retry') : t('刷新', 'Refresh');
+        this.refreshButton.setButtonText(action);
+        this.refreshButton.setTooltip(setup || retry ? action : t('刷新书库', 'Refresh library'));
+        this.settingsButton.buttonEl.hidden = setup;
+        const today = Number.isFinite(last.getTime()) && last.toDateString() === new Date().toDateString();
+        const shortTime = today ? t('今天 ', 'Today ') + last.toLocaleTimeString(t('zh-CN', 'en'), { hour: '2-digit', minute: '2-digit' }) + t(' 已检查', ' · Checked') : checked;
+        let summary = shortTime;
+        if (!configured) summary = settings.secretId ? t('保存的凭据不可用', 'Saved credential unavailable') : t('尚未连接阅读备份', 'Backup not configured');
+        else if (syncing) summary = checkProgress && checkProgress.total ? t('正在检查书籍 ', 'Checking books ') + checkProgress.done + ' / ' + checkProgress.total :
+            cache.books.length ? t('正在检查更新…', 'Checking for updates…') : t('正在获取书籍…', 'Fetching books…');
+        else if (phase === 'ready' || phase === 'partial') summary = shortTime + ' · ' + this.plugin.librarySummary;
+        else if (phase === 'auth' || phase === 'error') summary = (phase === 'auth' ? t('认证或访问权限异常', 'Authentication or access denied') : this.plugin.librarySummary) +
+            (cache.books.length ? t(' · 显示本地缓存', ' · Showing local cache') + ' · ' + checked : '');
+        this.status.dataset.phase = !configured ? 'setup' : phase;
+        this.failureDetails.buttonEl.hidden = phase !== 'partial' || !configured;
+        if (!this.failureDetails.buttonEl.hidden) {
+            this.failureDetails.setButtonText(this.plugin.librarySummary + ' ▾');
+            summary = shortTime;
+        }
+        this.status.setText(summary);
+        this.progress.hidden = !syncing;
+        if (checkProgress?.total) { this.progress.max = checkProgress.total; this.progress.value = checkProgress.done; }
+        else this.progress.removeAttribute('value');
+        if (!cache.books.length) this.renderEmpty(false);
     }
     private updateOrderButton() {
         this.bookOrder.setButtonText((this.plugin.settings.bookListSort === 'title' ? t('书名', 'Title') : t('修改时间', 'Modified')) + (this.plugin.settings.bookListDirection === 'asc' ? ' ↑' : ' ↓'));
@@ -113,7 +194,7 @@ export class BookSuggestModal extends Modal {
         }
         const rect = this.bookOrder.buttonEl.getBoundingClientRect(); menu.showAtPosition({ x: rect.left, y: rect.bottom });
     }
-    private renderBooks(preserveFeedback = false) {
+    private renderBooks(preserveFeedback = false, cacheChanged = false) {
         if (this.panel.busy || this.disposed) return;
         const query = this.inputEl.value.trim().toLocaleLowerCase();
         const matched = this.plugin.cache.books.filter(book => book.bookName.toLocaleLowerCase().includes(query));
@@ -129,43 +210,75 @@ export class BookSuggestModal extends Modal {
             return (first > second ? 1 : -1) * (this.plugin.settings.bookListDirection === 'asc' ? 1 : -1);
         });
         this.shownBooks = this.plugin.settings.bookListLimit > 0 ? matched.slice(0, this.plugin.settings.bookListLimit) : matched;
-        this.listCount.setText(t('书籍 ', 'Books ') + this.shownBooks.length + '/' + matched.length);
-        const book = this.shownBooks.find(book => book.fileHref === this.selected) || this.shownBooks[0] || null;
-        this.selected = book?.fileHref || null;
+        this.listCount.setText(this.shownBooks.length < matched.length ? t('显示 ', 'Showing ') + this.shownBooks.length + ' / ' + matched.length :
+            (query ? t('匹配 ', 'Matches: ') : '') + matched.length + t(' 本', ' books'));
+        const retained = this.shownBooks.find(book => book.fileHref === this.selected);
+        if (cacheChanged && this.selected && !retained) this.needsSelection = true;
+        const book = retained || (this.needsSelection ? null : this.shownBooks[0]) || null;
         const restoreListFocus = this.list.contains(this.list.ownerDocument.activeElement);
         this.list.empty();
-        for (const candidate of this.shownBooks) {
+        this.selectedRow = null;
+        for (const [index, candidate] of this.shownBooks.entries()) {
             const row = this.list.createEl('button', { cls: 'moonreader-book-item', attr: {
-                type: 'button', role: 'option', 'aria-selected': String(candidate === book), tabindex: candidate === book ? '0' : '-1', title: candidate.bookName,
-                id: 'moonreader-book-' + this.shownBooks.indexOf(candidate)
+                type: 'button', role: 'option', 'aria-selected': 'false', tabindex: '-1', title: candidate.bookName,
+                id: 'moonreader-book-' + index
             } });
             row.createSpan({ text: candidate.bookName });
             row.createEl('small', { text: String(candidate.notes.length), cls: 'moonreader-meta' });
             if (candidate.syncError) row.createSpan({ cls: 'moonreader-book-error', text: '!', attr: { 'aria-label': candidate.syncError, title: candidate.syncError } });
-            row.addEventListener('click', () => { if (!this.panel.busy) { this.selected = candidate.fileHref; this.renderBooks(); } });
+            row.addEventListener('click', () => { if (!this.panel.busy) {
+                this.selectBook(candidate, row);
+                this.setPicker(false);
+                if (this.switchBook.buttonEl.offsetWidth) this.switchBook.buttonEl.focus();
+            } });
         }
         this.inputEl.setAttribute('aria-controls', this.list.id ||= 'moonreader-book-list');
-        if (book) this.inputEl.setAttribute('aria-activedescendant', 'moonreader-book-' + this.shownBooks.indexOf(book));
-        else this.inputEl.removeAttribute('aria-activedescendant');
-        if (restoreListFocus) this.list.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus();
+        const row = book ? this.list.children[this.shownBooks.indexOf(book)] as HTMLButtonElement : null;
+        this.selectBook(book, row, preserveFeedback);
+        if (restoreListFocus) (row || this.inputEl).focus();
+    }
+    private selectBook(book: BookItem | null, row: HTMLButtonElement | null, preserveFeedback = false) {
+        if (this.selectedRow) {
+            this.selectedRow.tabIndex = -1;
+            this.selectedRow.setAttribute('aria-selected', 'false');
+        }
+        this.selectedRow = row;
+        const initial = this.selected === null;
+        this.selected = book?.fileHref || null;
+        this.switchBook.setButtonText(book ? t('切换书籍 · ', 'Switch book · ') + book.bookName + ' ▾' : t('选择书籍', 'Choose a book'));
+        if (!book) this.setPicker(true);
+        else if (initial && this.workspace.dataset.picker === undefined) this.setPicker(false);
+        if (row) {
+            this.needsSelection = false;
+            row.setAttribute('aria-selected', 'true');
+            row.tabIndex = 0;
+            this.inputEl.setAttribute('aria-activedescendant', row.id);
+        } else this.inputEl.removeAttribute('aria-activedescendant');
         this.panel.setBook(book, preserveFeedback);
         this.reading.hidden = !book;
         this.empty.hidden = !!book;
+        if (!book) this.renderEmpty(this.plugin.cache.books.length > 0);
+    }
+    private renderEmpty(filtered: boolean) {
+        const { syncing, libraryPhase: phase } = this.plugin;
+        const message = this.needsSelection && this.shownBooks.length ? t('原选书籍已不在当前列表，请重新选择。', 'The selected book is no longer listed. Choose a book to import.') : filtered ? t('试试其他关键词。', 'Try another search.') :
+            syncing ? t('正在读取阅读备份…', 'Fetching your reading backup…') :
+            !this.plugin.configured() ? t('连接备份后，这里会出现你的书籍。', 'Connect your backup to see your books here.') :
+            phase === 'error' || phase === 'auth' || phase === 'partial' ? t('暂无可用书籍，请查看上方检查结果。', 'No books available. See the check result above.') :
+            phase === 'ready' ? t('备份目录中没有书籍，请检查备份位置。', 'No books in the backup folder. Check the location.') : t('本地暂无可用书籍。', 'No locally cached books.');
         this.empty.empty();
-        if (!book) {
-            const hasBooks = this.plugin.cache.books.length > 0;
-            this.empty.createEl('h3', { text: hasBooks ? t('没有匹配的书籍', 'No matching books') : t('你的阅读笔记', 'Your reading notes') });
-            this.empty.createEl('p', { text: hasBooks ? t('试试其他关键词。', 'Try another search.') : t('连接阅读备份，获取书籍后即可插入笔记。', 'Connect your reading backup to start importing notes.') });
-            if (!hasBooks) new ButtonComponent(this.empty).setCta().setButtonText(this.plugin.configured() ? t('获取书籍', 'Fetch books') : t('连接备份', 'Connect backup'))
-                .onClick(() => { if (this.plugin.configured()) void this.plugin.refresh(); else this.plugin.openConnectionSettings(); });
-        }
+        this.empty.createEl('h3', { text: this.needsSelection && this.shownBooks.length ? t('请选择书籍', 'Choose a book') : filtered ? t('没有匹配的书籍', 'No matching books') : t('你的阅读笔记', 'Your reading notes') });
+        this.empty.createEl('p', { text: message });
     }
     private moveSelection(delta: number) {
         if (this.panel.busy || !this.shownBooks.length) return;
         const index = this.shownBooks.findIndex(book => book.fileHref === this.selected);
-        this.selected = this.shownBooks[(index + delta + this.shownBooks.length) % this.shownBooks.length].fileHref;
-        this.renderBooks();
-        this.list.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest' });
+        const next = index < 0 ? (delta > 0 ? 0 : this.shownBooks.length - 1) : (index + delta + this.shownBooks.length) % this.shownBooks.length;
+        const row = this.list.children[next] as HTMLButtonElement;
+        const focusList = this.list.contains(this.list.ownerDocument.activeElement);
+        this.selectBook(this.shownBooks[next], row);
+        if (focusList) row.focus();
+        row.scrollIntoView?.({ block: 'nearest' });
     }
     private updateBusy() {
         this.inputEl.disabled = this.panel.busy;

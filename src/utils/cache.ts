@@ -50,10 +50,23 @@ async function readCacheUnlocked(storage: CacheStorage, path: string, source: st
     return cache.source === source ? cache : empty;
 }
 export function writeCache(storage: CacheStorage, path: string, cache: BookCache): Promise<void> {
-    return withCacheLock(storage, path, () => writeCacheUnlocked(storage, path, cache));
+    return withCacheLock(storage, path, () => replaceText(storage, path, JSON.stringify(cache)));
 }
-async function writeCacheUnlocked(storage: CacheStorage, path: string, cache: BookCache): Promise<void> {
-    const text = JSON.stringify(cache);
+// Tie the small freshness record to the exact book snapshot it describes.
+export function writeCheckTime(storage: CacheStorage, path: string, snapshot: string, checkedAt: string) {
+    return withCacheLock(storage, path, () => replaceText(storage, path + '.check', JSON.stringify({ snapshot, checkedAt })));
+}
+export function readCheckTime(storage: CacheStorage, path: string, snapshot: string) {
+    return withCacheLock(storage, path, async () => {
+        const marker = path + '.check';
+        await recoverCache(storage, marker);
+        if (!await storage.exists(marker)) return snapshot;
+        const data = JSON.parse(await storage.read(marker));
+        return data?.snapshot === snapshot && typeof data.checkedAt === 'string' && Number.isFinite(Date.parse(data.checkedAt))
+            ? data.checkedAt as string : snapshot;
+    });
+}
+async function replaceText(storage: CacheStorage, path: string, text: string): Promise<void> {
     const temp = path + '.' + randomUUID() + '.tmp';
     const backup = path + '.bak';
     await recoverCache(storage, path);

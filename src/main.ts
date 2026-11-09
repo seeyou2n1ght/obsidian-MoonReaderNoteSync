@@ -4,7 +4,7 @@ import { MoonReaderWebDAVSettingTab } from './ui/settingTab';
 import { WebDAVClient, normalizeWebDavUrl } from './utils/webdav';
 import { BookSuggestModal } from './ui/bookSuggestModal';
 import { randomUUID } from 'crypto';
-import { BookCache, readCache, writeCache, sourceId } from './utils/cache';
+import { BookCache, readCache, writeCache, readCheckTime, writeCheckTime, sourceId } from './utils/cache';
 import { renderNotes } from './utils/notes';
 import { syncBooks } from './utils/sync';
 import { t, errorMessage, UserError } from './i18n';
@@ -18,6 +18,12 @@ export default class MoonReaderSyncPlugin extends Plugin {
     private connectionToken: symbol | null = null;
     private blockedRefresh: { previous: string; message: string } | null = null;
     status = '';
+    libraryPhase: 'cached' | 'checking' | 'ready' | 'partial' | 'auth' | 'error' = 'cached';
+    librarySummary = '';
+    lastChecked = '';
+    checkProgress: { done: number; total: number } | null = null;
+    private checkedSource = '';
+    private warmupDeferred = false;
     readonly listeners = new Set<() => void>();
     readonly sessionImports = new Set<string>();
     private readonly clearedCredentialNames = new Set<string>();
@@ -70,6 +76,20 @@ export default class MoonReaderSyncPlugin extends Plugin {
             t('已保存的密码不可用，请重新输入并保存', 'Saved password unavailable; re-enter and save it') :
             t('连接未配置，请输入密码并保存', 'Connection not configured; enter your password and save');
     }
+    private warmLibrary() {
+        if (!this.configured()) return;
+        if (this.connectionSaving || this.syncing) { this.warmupDeferred = true; return; }
+        // An explicit refresh counts as this session's check, including an empty listing or failure.
+        if (this.checkedSource !== this.connectionKey()) void this.refresh();
+    }
+    private resumeWarmup() {
+        if (!this.warmupDeferred || this.connectionSaving || this.syncing) return;
+        this.warmupDeferred = false;
+        if (this.browser && !this.disposed) this.warmLibrary();
+    }
+    private connectionKey() {
+        return JSON.stringify([this.settings.webDavUrl, this.settings.username, this.settings.secretId]);
+    }
     suggestCredentialName(webDavUrl: string): string {
         let server = 'backup';
         try { server = new URL(webDavUrl).hostname.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40).replace(/^-+|-+$/g, '') || server; } catch { /* allow editing an incomplete URL */ }
@@ -100,6 +120,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
             this.blockedRefresh = null;
         }
         this.notify();
+        this.resumeWarmup();
     }
     async saveConnection(webDavUrl: string, username: string, password: string, isActive: () => boolean, existingSecretId?: string, newCredentialName?: string, onCommit?: () => void) {
         const canCommit = () => !this.disposed && isActive();
@@ -116,13 +137,13 @@ export default class MoonReaderSyncPlugin extends Plugin {
                 throw new UserError(t('所选凭据已更改或不可用，请重新测试后保存。', 'The selected credential changed or is unavailable. Test again before saving.'));
             }
             if (!await this.updateSettings({ webDavUrl, username, secretId: existingSecretId }, () => verifyCredential(existingSecretId))) return false;
-            await this.loadCache(); return true;
+            await this.loadSavedConnection(); return true;
         }
         if (newCredentialName === undefined && this.settings.secretId && username === this.settings.username &&
             new URL(webDavUrl).origin === new URL(this.settings.webDavUrl).origin &&
             this.app.secretStorage.getSecret(this.settings.secretId) === password) {
             if (!await this.updateSettings({ webDavUrl, username }, () => verifyCredential(this.settings.secretId))) return false;
-            await this.loadCache(); return true;
+            await this.loadSavedConnection(); return true;
         }
         const secretId = this.validateNewCredentialName(newCredentialName ?? this.suggestCredentialName(webDavUrl));
         const clearCreatedCredential = () => {
@@ -145,7 +166,12 @@ export default class MoonReaderSyncPlugin extends Plugin {
             throw error;
         }
         // A committed connection must switch caches even if its form has closed.
-        await this.loadCache(); return true;
+        await this.loadSavedConnection(); return true;
+    }
+    private async loadSavedConnection() {
+        // A verified replacement can repair a password without changing the keychain entry name.
+        this.checkedSource = '';
+        await this.loadCache();
     }
     private currentSource(): string {
         return sourceId(normalizeWebDavUrl(this.settings.webDavUrl), this.settings.username);
@@ -154,6 +180,9 @@ export default class MoonReaderSyncPlugin extends Plugin {
         return normalizePath(this.manifest.dir! + '/' + (source ? 'moonreader_cache.' + source + '.json' : 'moonreader_cache.json'));
     }
     async loadCache() {
+        this.lastChecked = '';
+        this.libraryPhase = 'cached';
+        this.librarySummary = '';
         try {
             const source = this.currentSource();
             this.cache = await readCache(this.app.vault.adapter, this.cachePath(source), source, this.settings.webDavUrl);
@@ -167,8 +196,15 @@ export default class MoonReaderSyncPlugin extends Plugin {
                 }
             }
             this.status = this.cache.books.length ? this.cache.books.length + t(' 本书 · 本地缓存', ' books · Local cache') : t('尚无缓存书籍', 'No cached books yet');
+            this.lastChecked = this.cache.checkedAt;
+            if (this.lastChecked) {
+                try { this.lastChecked = await readCheckTime(this.app.vault.adapter, this.cachePath(source), this.lastChecked); }
+                catch { this.status += t(' · 最近检查记录不可读，显示缓存保存时间', ' · Last check record unavailable; showing cache save time'); }
+            }
         } catch {
             this.cache = { version: 1, source: '', checkedAt: '', books: [] };
+            this.libraryPhase = 'error';
+            this.librarySummary = t('本地缓存无法读取', 'Cannot read local cache');
             this.status = t('缓存无法读取。可刷新重新获取；原缓存文件已保留。', 'Cannot read the cache. Refresh to fetch it again; the original file is preserved.');
         }
         this.notify();
@@ -185,10 +221,10 @@ export default class MoonReaderSyncPlugin extends Plugin {
         return save;
     }
     notify() { if (!this.disposed) this.listeners.forEach(fn => fn()); }
-    openLibrary(refreshIfEmpty = true) {
+    openLibrary(checkOnOpen = true) {
         if (this.browser) {
-            this.browser.inputEl.focus();
-            if (refreshIfEmpty && !this.cache.books.length && this.configured()) void this.refresh();
+            this.browser.focusLibrary();
+            if (checkOnOpen) this.warmLibrary();
             return;
         }
         const active = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -201,7 +237,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
             (leaves.length === 1 && leaves[0].view instanceof MarkdownView ? leaves[0].view : null);
         this.browser = new BookSuggestModal(this.app, this, view, () => { this.browser = null; });
         this.browser.open();
-        if (refreshIfEmpty && !this.cache.books.length && this.configured()) void this.refresh();
+        if (checkOnOpen) this.warmLibrary();
     }
     openConnectionSettings() {
         if (this.connectionModal) return;
@@ -230,6 +266,12 @@ export default class MoonReaderSyncPlugin extends Plugin {
             this.notify();
             return;
         }
+        const connection = this.connectionKey();
+        this.checkedSource = connection;
+        const stale = () => this.disposed || connection !== this.connectionKey();
+        let savingCache = false;
+        this.libraryPhase = 'checking';
+        this.checkProgress = null;
         this.syncing = true;
         const settings = { ...this.settings };
         this.status = t('正在读取远端目录…', 'Reading remote folder…');
@@ -238,29 +280,55 @@ export default class MoonReaderSyncPlugin extends Plugin {
             const source = this.currentSource();
             const password = this.app.secretStorage.getSecret(settings.secretId);
             if (!password) throw new UserError(t('已保存的密码不可用，请重新输入并保存。', 'Saved password unavailable; re-enter and save it.'));
+            let lastProgress = -Infinity;
             const result = await syncBooks(new WebDAVClient(settings.webDavUrl, settings.username, password),
                 this.cache.source === source ? this.cache.books : [], (done, total) => {
+                    if (stale()) return;
+                    const now = performance.now();
+                    if (done !== total && now - lastProgress < 100) return;
+                    lastProgress = now;
+                    this.checkProgress = { done, total };
                     this.status = t('正在检查书籍', 'Checking books') + ': ' + done + ' / ' + total;
                     this.notify();
-                }, () => this.disposed);
-            if (this.disposed || source !== this.currentSource()) return;
+                }, stale);
+            if (stale()) return;
             const next: BookCache = { version: 1, source, checkedAt: result.checkedAt, books: result.books };
+            const path = this.cachePath(source);
+            const unchanged = this.cache.source === source && !!this.cache.checkedAt && result.books.length === this.cache.books.length &&
+                result.books.every((book, index) => this.cache.books[index] === book) && await this.app.vault.adapter.exists(path);
+            savingCache = true;
             try {
-                await writeCache(this.app.vault.adapter, this.cachePath(source), next);
+                if (unchanged) await writeCheckTime(this.app.vault.adapter, path, this.cache.checkedAt, result.checkedAt);
+                else await writeCache(this.app.vault.adapter, path, next);
             } catch {
                 throw new UserError(t('远端检查已完成，但本地缓存保存失败。请检查插件目录的访问权限后重试。', 'Remote check completed, but saving the local cache failed. Check access to the plugin folder and retry.'));
             }
-            this.cache = next;
+            if (stale()) return;
+            this.lastChecked = result.checkedAt;
+            if (!unchanged) this.cache = next;
+            this.libraryPhase = result.failed ? 'partial' : 'ready';
+            const changes: string[] = [];
+            if (result.updated) changes.push(result.updated + t(' 本更新', ' books updated'));
+            if (result.removed) changes.push(result.removed + t(' 本移除', ' books removed'));
+            if (result.failed) changes.push(result.failed + t(' 本更新失败', ' book updates failed'));
+            if (!result.books.length && !result.failed) changes.push(t('目录中没有 .an 文件', 'No .an files in this folder'));
+            this.librarySummary = changes.join(' · ') || t('无更新', 'No updates');
             this.status = t('刷新完成', 'Refresh complete') + ': ' + result.updated + t(' 本更新，', ' updated, ') +
                 result.unchanged + t(' 本未变化，', ' unchanged, ') + result.failed + t(' 本失败。', ' failed.');
+            if (result.removed) this.status += ' ' + result.removed + t(' 本移除。', ' books removed.');
             if (!result.books.length && !result.failed) this.status += t('目录中没有 .an 文件。请检查备份位置。', 'No .an files in this folder. Check the backup location.');
             if (result.failed) this.status += t('已有缓存已保留；可重试刷新。失败书籍：', 'Existing cache retained; refresh to retry. Failed books: ') + result.failures.join('、');
         } catch (error) {
-            if (this.disposed) return;
+            if (stale()) return;
+            const code = (error as { status?: number } | null)?.status;
+            this.libraryPhase = code === 401 || code === 403 ? 'auth' : 'error';
+            this.librarySummary = savingCache ? t('本地缓存保存失败', 'Could not save local cache') : t('远端检查失败', 'Remote check failed');
             this.status = errorMessage(error) + ' ' + t('已有缓存仍可浏览和导入。', 'Existing cached books remain available.');
         } finally {
             this.syncing = false;
+            this.checkProgress = null;
             this.notify();
+            this.resumeWarmup();
         }
     }
 }

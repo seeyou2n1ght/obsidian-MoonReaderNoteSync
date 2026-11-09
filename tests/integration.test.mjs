@@ -202,12 +202,12 @@ test('settings disk failure leaves effective settings unchanged and allows retry
 test('library defaults to cursor insertion; closing does not write; overwrite requires confirmation', async t => {
     const h = await harness(t), before = h.files.get(h.target);
     let modal = await openImport(h);
-    assert.equal(button(modal.modalEl, 'Insert 1 notes').disabled, false);
+    assert.equal(button(modal.modalEl, 'Insert all 1 note').disabled, false);
     modal.close();
     assert.equal(h.state.writes, 0);
     modal = await openImport(h); chooseMode(h, modal, 'overwrite');
-    assert.equal(button(modal.modalEl, 'Replace 1 notes').disabled, true);
-    button(modal.modalEl, 'Replace 1 notes').click();
+    assert.equal(button(modal.modalEl, 'Replace all 1 note').disabled, true);
+    button(modal.modalEl, 'Replace all 1 note').click();
     assert.equal(h.state.writes, 0);
     button(modal.modalEl, 'Confirm replacement').click();
     await until(() => h.state.writes === 1);
@@ -218,13 +218,13 @@ test('library defaults to cursor insertion; closing does not write; overwrite re
 test('import double click commits once; failed write retains target and mode; success closes with a notice', async t => {
     const h = await harness(t), modal = await openImport(h), before = h.files.get(h.target);
     chooseMode(h, modal, 'append'); h.state.failWrite = true;
-    button(modal.modalEl, 'Append 1 notes').click();
-    await until(() => [...modal.modalEl.querySelectorAll('button')].some(el => el.textContent === 'Append 1 notes' && !el.disabled));
+    button(modal.modalEl, 'Append all 1 note').click();
+    await until(() => [...modal.modalEl.querySelectorAll('button')].some(el => el.textContent === 'Append all 1 note' && !el.disabled));
     assert.equal(h.files.get(h.target), before); assert.equal(h.state.writes, 0);
     assert.match(modal.contentEl.textContent, /Append to end/);
     h.state.failWrite = false;
     const gate = deferred(); h.state.beforeWrite = () => gate.promise;
-    const submit = button(modal.modalEl, 'Append 1 notes');
+    const submit = button(modal.modalEl, 'Append all 1 note');
     submit.click(); submit.click();
     assert.equal(submit.disabled, true);
     gate.resolve(); await until(() => h.state.writes === 1);
@@ -240,32 +240,34 @@ test('no active note requires a target; stale cursor is refused with an append r
     const picker = [...h.document.querySelectorAll('[role=dialog]')].at(-1);
     picker.querySelector('input').dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
     assert.equal(h.state.writes, 0);
-    await until(() => !button(empty.modalEl, 'Append 1 notes').disabled);
-    button(empty.modalEl, 'Append 1 notes').click(); await until(() => h.state.writes === 1);
+    await until(() => !button(empty.modalEl, 'Append all 1 note').disabled);
+    button(empty.modalEl, 'Append all 1 note').click(); await until(() => h.state.writes === 1);
     const stale = await openImport(h);
     h.files.set(h.target, h.files.get(h.target) + 'Concurrent edit.');
-    button(stale.modalEl, 'Insert 1 notes').click();
+    button(stale.modalEl, 'Insert all 1 note').click();
     button(stale.modalEl, 'Import again').click();
     assert.equal(h.state.writes, 1);
     assert.match(stale.contentEl.textContent, /original note.*changed/i);
     button(stale.modalEl, 'Use append instead').click();
-    button(stale.modalEl, 'Append 1 notes').click(); button(stale.modalEl, 'Import again').click(); await until(() => h.state.writes === 2);
+    button(stale.modalEl, 'Append all 1 note').click(); button(stale.modalEl, 'Import again').click(); await until(() => h.state.writes === 2);
     assert.match(h.files.get(h.target), /Concurrent edit/);
 });
 test('changing overwrite target resets confirmation and canceling picker preserves context', async t => {
     const h = await harness(t), modal = await openImport(h);
     chooseMode(h, modal, 'overwrite');
-    button(modal.modalEl, 'More').click(); button(h.document.querySelector('[role=menu]'), 'Change target note').click();
+    assert.equal(modal.contentEl.querySelector('.moonreader-import-actions').hidden, true);
+    button(modal.modalEl, 'Cancel').click();
+    modal.contentEl.querySelector('.moonreader-destination button').click();
     let picker = [...h.document.querySelectorAll('[role=dialog]')].at(-1);
     picker.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    assert.equal(button(modal.modalEl, 'Confirm replacement').disabled, false);
-    button(modal.modalEl, 'More').click(); button(h.document.querySelector('[role=menu]'), 'Change target note').click();
+    assert.equal(modal.contentEl.querySelector('.moonreader-confirmation').hidden, true);
+    modal.contentEl.querySelector('.moonreader-destination button').click();
     picker = [...h.document.querySelectorAll('[role=dialog]')].at(-1);
     const search = picker.querySelector('input'); change(h, search, 'Other');
     search.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
     assert.match(modal.contentEl.textContent, /Other.md/);
     assert.equal(modal.contentEl.querySelector('.moonreader-confirmation').hidden, true);
-    await until(() => !button(modal.modalEl, 'Append 1 notes').disabled);
+    await until(() => !button(modal.modalEl, 'Append all 1 note').disabled);
     assert.equal(h.state.writes, 0);
 });
 test('preview ignores stale async renders and closing disposes its components', async t => {
@@ -331,27 +333,26 @@ test('selection and search update the preview in the same dialog and no matches 
     assert.equal(h.document.querySelectorAll('[role=dialog]').length, 1);
     assert.equal(h.state.writes, 0);
     change(h, modal.inputEl, 'no matches');
-    assert.equal(button(modal.modalEl, 'Insert 0 notes').disabled, true);
+    assert.equal(button(modal.modalEl, 'Insert all 0 notes').disabled, true);
     assert.equal(modal.contentEl.querySelector('.moonreader-reading > div').hidden, true);
     change(h, modal.inputEl, 'Synthetic');
-    await until(() => !button(modal.modalEl, 'Insert 1 notes').disabled);
-    button(modal.modalEl, 'Insert 1 notes').click();
+    await until(() => !button(modal.modalEl, 'Insert all 1 note').disabled);
+    button(modal.modalEl, 'Insert all 1 note').click();
     assert.equal(h.state.writes, 1);
     assert.equal(modal.modalEl.isConnected, false);
 });
 
-test('refresh without saved credentials reports inline and only settings opens the connection form', async t => {
+test('an unconfigured library shows a setup action without sending a request', async t => {
     const h = await harness(t), modal = await openImport(h);
     const cache = h.plugin.cache;
     let requests = 0;
     h.host.requestUrl = async () => { requests++; throw new Error('Unexpected request'); };
-    modal.contentEl.querySelector('button[aria-label="Refresh library"]').click();
-    await until(() => modal.contentEl.querySelector('[role=status]').textContent.includes('Cannot refresh'));
+    assert.match(modal.contentEl.querySelector('[role=status]').textContent, /Backup not configured/);
     assert.equal(h.document.querySelectorAll('[role=dialog]').length, 1);
     assert.equal(h.plugin.cache, cache);
     assert.equal(requests, 0);
     assert.equal(h.state.saves, 0);
-    modal.contentEl.querySelector('button[aria-label="Connection settings"]').click();
+    button(modal.contentEl, 'Connect backup').click();
     assert.equal(h.document.querySelectorAll('[role=dialog]').length, 2);
     assert.ok(button(h.document.querySelector('.moonreader-connection'), 'Test connection'));
 });
@@ -365,13 +366,13 @@ test('keyboard cannot bypass overwrite confirmation; choosing another book cance
     h.plugin.notify();
     modal.contentEl.querySelector('[role=option][title="Second book"]').click();
     assert.equal(modal.contentEl.querySelector('.moonreader-confirmation').hidden, true);
-    await until(() => !button(modal.modalEl, 'Append 1 notes').disabled);
+    await until(() => !button(modal.modalEl, 'Append all 1 note').disabled);
 });
 
 test('close waits for the pending write and prevents repeated submission and selection changes', async t => {
     const h = await harness(t), modal = await openImport(h), gate = deferred();
     chooseMode(h, modal, 'append'); h.state.beforeWrite = () => gate.promise;
-    button(modal.modalEl, 'Append 1 notes').click();
+    button(modal.modalEl, 'Append all 1 note').click();
     modal.close();
     assert.equal(modal.modalEl.isConnected, true);
     assert.equal(modal.inputEl.disabled, true);
@@ -672,7 +673,7 @@ test('library falls back to an open Markdown note but does not use a closed rece
     h.plugin.cache.books = [book]; h.app.workspace.getActiveViewOfType = () => null;
     h.app.workspace.getMostRecentLeaf = () => ({ view: {} });
     h.plugin.openLibrary(false);
-    assert.ok(button(h.document.querySelector('.moonreader-library'), 'Insert 1 notes'));
+    assert.ok(button(h.document.querySelector('.moonreader-library'), 'Insert all 1 note'));
     h.plugin.browser.close();
     h.plugin.recentMarkdownView = h.view;
     h.app.workspace.getLeavesOfType = () => [];
@@ -684,28 +685,56 @@ test('library falls back to an open Markdown note but does not use a closed rece
 test('repeated imports require explicit confirmation and keyboard/cancel cannot duplicate content', async t => {
     const h = await harness(t);
     let modal = await openImport(h); chooseMode(h, modal, 'append');
-    button(modal.modalEl, 'Append 1 notes').click(); await until(() => h.state.writes === 1);
+    button(modal.modalEl, 'Append all 1 note').click(); await until(() => h.state.writes === 1);
     modal = await openImport(h); chooseMode(h, modal, 'append');
     assert.match(modal.contentEl.querySelector('.moonreader-warning').textContent, /already imported/);
-    button(modal.modalEl, 'Append 1 notes').click();
+    button(modal.modalEl, 'Append all 1 note').click();
     modal.inputEl.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
     assert.equal(h.state.writes, 1);
     button(modal.modalEl, 'Cancel').click(); assert.equal(h.state.writes, 1);
-    button(modal.modalEl, 'Append 1 notes').click(); button(modal.modalEl, 'Import again').click();
+    button(modal.modalEl, 'Append all 1 note').click(); button(modal.modalEl, 'Import again').click();
     await until(() => h.state.writes === 2);
     assert.equal(h.files.get(h.target).split('Highlight').length - 1, 2);
 });
 
-test('returning to an already open empty library fetches once without creating another panel', async t => {
-    const h = await harness(t), dav = await server(t);
-    await connected(h, dav);
-    h.plugin.openLibrary(false);
-    let refreshes = 0; h.plugin.refresh = async () => { refreshes++; };
-    h.plugin.openLibrary();
-    assert.equal(refreshes, 1);
+test('first open checks an already cached library once, even when the remote result is empty', async t => {
+    const h = await harness(t), dav = await server(t), gate = deferred();
+    await connected(h, dav); await h.plugin.loadCache();
+    h.plugin.cache.books = [book]; dav.state.body = xml(''); dav.state.beforeList = () => gate.promise;
+    assert.equal(dav.state.requests.length, 0);
+    h.plugin.openLibrary(); h.plugin.openLibrary();
+    const modal = h.document.querySelector('.moonreader-library');
+    assert.ok(modal.querySelector('[aria-selected=true]').textContent.includes(book.bookName));
+    await until(() => dav.state.requests.length === 1);
+    assert.equal(modal.querySelector('progress').hidden, false);
+    gate.resolve(); await until(() => !h.plugin.syncing);
+    assert.equal(h.plugin.cache.books.length, 0);
+    assert.match(modal.querySelector('[data-phase=ready]').textContent, /No .an files/);
+    h.plugin.browser.close(); h.plugin.openLibrary();
+    assert.equal(h.plugin.syncing, false);
+    assert.equal(dav.state.requests.length, 1);
     assert.equal(h.document.querySelectorAll('.moonreader-library').length, 1);
-    h.plugin.cache.books = [book]; h.plugin.openLibrary();
-    assert.equal(refreshes, 1);
+});
+
+test('failed warmup retains cached notes, manual retry updates status and a changed source gets a new check', async t => {
+    const h = await harness(t), dav = await server(t);
+    await connected(h, dav); await h.plugin.loadCache();
+    h.plugin.cache.books = [book]; dav.state.status = 503;
+    h.plugin.openLibrary(); await until(() => !h.plugin.syncing);
+    const modal = h.document.querySelector('.moonreader-library');
+    assert.ok(modal.querySelector('[data-phase=error]'));
+    assert.ok(modal.querySelector('[aria-selected=true]'));
+    h.plugin.openLibrary(); assert.equal(h.plugin.syncing, false);
+    dav.state.status = 403; button(modal, 'Retry').click(); await until(() => !h.plugin.syncing);
+    assert.ok(button(modal, 'Check credentials'));
+    const other = await server(t);
+    await h.plugin.saveConnection(other.url, 'reader', 'synthetic-test-password', () => true, 'moonreader-test');
+    other.state.getStatus = 500;
+    h.plugin.openLibrary(); await until(() => !h.plugin.syncing);
+    assert.match(modal.querySelector('.moonreader-library-toolbar').textContent, /1 book updates failed/);
+    other.state.getStatus = 200; button(modal, 'Retry').click(); await until(() => !h.plugin.syncing);
+    assert.ok(modal.querySelector('[data-phase=ready]'));
+    assert.equal(h.plugin.cache.books[0].notes[0].highlightText, 'Highlight');
 });
 
 test('library sorts backups before limiting, searches all cached books and never changes cache order', async t => {
@@ -723,11 +752,11 @@ test('library sorts backups before limiting, searches all cached books and never
     assert.deepEqual(titles(), ['Book 2', 'Book 10', 'Alpha', 'beta']);
     await h.plugin.updateSettings({ bookListLimit: 1 }); h.plugin.notify();
     assert.deepEqual(titles(), ['Book 2']);
-    assert.match(modal.contentEl.textContent, /Books 1\/4/);
+    assert.match(modal.contentEl.textContent, /Showing 1 \/ 4/);
     change(h, modal.inputEl, 'Alpha');
     assert.deepEqual(titles(), ['Alpha']);
     change(h, modal.inputEl, 'absent');
-    assert.deepEqual(titles(), []); assert.equal(button(modal.modalEl, 'Insert 0 notes').disabled, true);
+    assert.deepEqual(titles(), []); assert.equal(button(modal.modalEl, 'Insert all 0 notes').disabled, true);
     change(h, modal.inputEl, '');
     await h.plugin.updateSettings({ bookListSort: 'title', bookListDirection: 'asc', bookListLimit: 0 }); h.plugin.notify();
     assert.deepEqual(titles(), ['Alpha', 'beta', 'Book 2', 'Book 10']);
@@ -751,7 +780,7 @@ test('display limits do not reduce WebDAV downloads or cached books', async t =>
     assert.equal(h.plugin.cache.books.length, 3);
     const modal = new h.BookSuggestModal(h.app, h.plugin, h.view, () => {}); modal.open();
     assert.equal(modal.contentEl.querySelectorAll('[role=option]').length, 1);
-    assert.match(modal.contentEl.textContent, /Books 1\/3/);
+    assert.match(modal.contentEl.textContent, /Showing 1 \/ 3/);
     modal.close();
 });
 
@@ -785,17 +814,17 @@ test('sort menu preserves search and selection, saves both directions and keeps 
     assert.equal(h.state.writes, 0); modal.close();
 });
 
-test('library hides healthy connection status and shortens the target without hiding replacement details', async t => {
+test('library shows the configured server and retains explicit replacement target details', async t => {
     const h = await harness(t);
     h.target.path = 'Folder/Target.md';
     const modal = await openImport(h);
-    const destination = modal.contentEl.querySelector('.moonreader-destination > div');
-    assert.equal(destination.textContent, 'Target.md'); assert.equal(destination.title, h.target.path);
+    const destination = modal.contentEl.querySelector('.moonreader-destination button');
+    assert.equal(destination.textContent, h.target.path); assert.equal(destination.title, h.target.path);
     assert.ok(destination.getAttribute('aria-label').includes(h.target.path));
-    assert.equal(modal.contentEl.querySelector('.moonreader-connection-status').hidden, false);
+    assert.equal(modal.contentEl.querySelector('.moonreader-source').hidden, true);
     h.secrets.set('synthetic', 'synthetic-password');
     await h.plugin.updateSettings({ username: 'reader', secretId: 'synthetic' }); h.plugin.notify();
-    assert.equal(modal.contentEl.querySelector('.moonreader-connection-status').hidden, true);
+    assert.equal(modal.contentEl.querySelector('.moonreader-source').hidden, false);
     chooseMode(h, modal, 'overwrite');
     assert.ok(modal.contentEl.querySelector('.moonreader-confirmation').textContent.includes(h.target.path));
     assert.equal(h.state.writes, 0); modal.close();
@@ -1229,7 +1258,7 @@ test('refresh listing and download timeouts retain notes, release the lock and i
 test('closing the captured Markdown view refuses cursor insertion and allows explicit append recovery', async t => {
     const h = await harness(t), modal = await openImport(h), before = h.files.get(h.target);
     h.app.workspace.getLeavesOfType = () => [];
-    button(modal.contentEl, 'Insert 1 notes').click();
+    button(modal.contentEl, 'Insert all 1 note').click();
     await until(() => !modal.panel.busy);
     assert.equal(h.state.writes, 0);
     assert.equal(h.files.get(h.target), before);
@@ -1237,7 +1266,7 @@ test('closing the captured Markdown view refuses cursor insertion and allows exp
     assert.equal(modal.panel.completed, false);
     assert.match(modal.contentEl.querySelector('.moonreader-import-feedback .moonreader-status').textContent, /closed/);
     button(modal.contentEl, 'Use append instead').click();
-    button(modal.contentEl, 'Append 1 notes').click();
+    button(modal.contentEl, 'Append all 1 note').click();
     await until(() => h.state.writes === 1);
     assert.ok(h.files.get(h.target).startsWith(before));
     assert.ok(h.files.get(h.target).includes('Highlight'));
@@ -1284,24 +1313,29 @@ test('older default-mode failures cannot undo a later successful choice', async 
 test('a failed import catches up deferred cache, selection and preference changes before retry', async t => {
     const h = await harness(t), modal = await openImport(h), gate = deferred();
     chooseMode(h, modal, 'append'); h.state.beforeWrite = () => gate.promise;
-    button(modal.contentEl, 'Append 1 notes').click(); await until(() => modal.panel.busy);
+    button(modal.contentEl, 'Append all 1 note').click(); await until(() => modal.panel.busy);
     h.plugin.cache.books = [{ ...book, fileHref: 'https://fixture.test/dav/replacement.an', bookName: 'Replacement book', notes: [{ ...book.notes[0], highlightText: 'New highlight' }] }];
     h.plugin.settings.bookListLimit = 1; h.plugin.notify();
     assert.equal(modal.contentEl.querySelector('.moonreader-book-title').textContent, book.bookName);
     h.state.failWrite = true; gate.resolve(); await until(() => !modal.panel.busy);
     assert.equal(modal.contentEl.querySelector('.moonreader-book-item span').textContent, 'Replacement book');
-    assert.equal(modal.contentEl.querySelector('.moonreader-book-title').textContent, 'Replacement book');
+    assert.equal(modal.contentEl.querySelector('[aria-selected=true]'), null);
+    assert.match(modal.contentEl.querySelector('.moonreader-empty').textContent, /Choose a book/);
+    assert.equal(button(modal.contentEl, 'Append all 0 notes').disabled, true);
+    modal.inputEl.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+    assert.equal(h.state.writes, 0);
     assert.match(modal.contentEl.querySelector('.moonreader-import-feedback .moonreader-status').textContent, /Operation failed/);
+    modal.contentEl.querySelector('.moonreader-book-item').click();
     await until(() => modal.contentEl.querySelector('.moonreader-preview').textContent.includes('New highlight'));
     h.state.failWrite = false; h.state.beforeWrite = null;
-    button(modal.contentEl, 'Append 1 notes').click(); await until(() => h.state.writes === 1);
+    button(modal.contentEl, 'Append all 1 note').click(); await until(() => h.state.writes === 1);
     assert.ok(h.files.get(h.target).includes('New highlight')); assert.ok(!h.files.get(h.target).includes('> Highlight'));
 });
 
 test('an import records the source captured before a concurrent cache switch', async t => {
     const h = await harness(t); h.plugin.cache.source = 'old-source';
     const modal = await openImport(h), gate = deferred(); chooseMode(h, modal, 'append'); h.state.beforeWrite = () => gate.promise;
-    button(modal.contentEl, 'Append 1 notes').click(); await until(() => modal.panel.busy);
+    button(modal.contentEl, 'Append all 1 note').click(); await until(() => modal.panel.busy);
     h.plugin.cache = { ...h.plugin.cache, source: 'new-source', books: [] }; h.plugin.notify();
     gate.resolve(); await until(() => !modal.panel.busy);
     assert.ok(h.plugin.sessionImports.has(JSON.stringify(['old-source', book.fileHref, h.target.path])));
@@ -1351,7 +1385,7 @@ test('default orders drive the library, bounded and full previews, and complete 
     const preview = () => modal.contentEl.querySelector('.moonreader-book-preview').textContent;
     await until(() => preview() === 'ABC');
     assert.equal(modal.contentEl.querySelector('[aria-label="Book order"]').textContent, 'Title ↓');
-    button(modal.contentEl, 'Preview all 4 notes').click();
+    button(modal.contentEl, 'Preview all').click();
     await until(() => preview() === 'ABCX');
     const order = modal.contentEl.querySelector('select[aria-label="Note order"]');
     change(h, order, 'time-asc', 'change');
@@ -1362,7 +1396,7 @@ test('default orders drive the library, bounded and full previews, and complete 
     await until(() => preview() === 'ABC');
     assert.equal(pref('Default note order').value, 'time-desc');
     assert.equal(notes.map(n => n.highlightText).join(''), 'XBCA');
-    button(modal.contentEl, 'Insert 4 notes').click();
+    button(modal.contentEl, 'Insert all 4 notes').click();
     await until(() => h.state.writes === 1);
     assert.ok(h.files.get(h.target).endsWith('ABCX'));
     tab.hide();
@@ -1379,7 +1413,7 @@ test('sorting and pending preview block every write entry until the selected ord
         const preview = modal.contentEl.querySelector('.moonreader-book-preview');
         await until(() => preview.textContent === 'ABC');
         if (replace) chooseMode(h, modal, 'overwrite');
-        const action = button(modal.contentEl, replace ? 'Confirm replacement' : 'Insert 4 notes');
+        const action = button(modal.contentEl, replace ? 'Confirm replacement' : 'Insert all 4 notes');
         const save = deferred(), render = deferred();
         h.state.beforeSave = () => save.promise;
         const original = h.host.MarkdownRenderer.render;
@@ -1405,7 +1439,7 @@ test('sorting and pending preview block every write entry until the selected ord
 test('expanded preview skips same-book searches and coalesces template edits', async t => {
     const h = await harness(t), modal = await openImport(h);
     h.plugin.cache.books = [{ ...book, notes: Array(120).fill(book.notes[0]) }]; h.plugin.notify();
-    button(modal.contentEl, 'Preview all 120 notes').click();
+    button(modal.contentEl, 'Preview all').click();
     await until(() => modal.contentEl.querySelectorAll('.moonreader-book-preview blockquote').length === 240);
     let renders = 0;
     const original = h.host.MarkdownRenderer.render;
@@ -1414,16 +1448,102 @@ test('expanded preview skips same-book searches and coalesces template edits', a
     assert.equal(renders, 0);
     const editor = modal.contentEl.querySelector('textarea');
     for (const template of ['1', '12', '123']) change(h, editor, template);
-    assert.equal(button(modal.contentEl, 'Insert 120 notes').disabled, true);
+    assert.equal(button(modal.contentEl, 'Insert all 120 notes').disabled, true);
     await until(() => modal.contentEl.querySelector('.moonreader-book-preview').textContent === '123'.repeat(120));
     assert.equal(renders, 1);
-    assert.equal(button(modal.contentEl, 'Insert 120 notes').disabled, false);
+    assert.equal(button(modal.contentEl, 'Insert all 120 notes').disabled, false);
     h.state.beforeSave = async () => { throw new Error('Controlled save failure'); };
     const order = modal.contentEl.querySelector('[aria-label="Note order"]');
     change(h, order, 'chapter-desc', 'change');
     await until(() => !order.disabled);
     assert.equal(order.value, 'backup');
     assert.match(modal.contentEl.querySelector('.moonreader-preview-toolbar').textContent, /Order was not saved.*Backup order/);
-    assert.equal(button(modal.contentEl, 'Insert 120 notes').disabled, false);
+    assert.equal(button(modal.contentEl, 'Insert all 120 notes').disabled, false);
     modal.close();
+});
+
+test('unchanged refresh writes only freshness metadata and restores it across cache loads', async t => {
+    const h = await harness(t), dav = await server(t);
+    await connected(h, dav); await h.plugin.refresh();
+    const books = h.plugin.cache.books, snapshot = h.plugin.cache.checkedAt;
+    const storage = h.app.vault.adapter, write = storage.write.bind(storage), writes = [];
+    storage.write = async (path, text) => { writes.push({ path, text }); await write(path, text); };
+    await h.plugin.refresh();
+    assert.equal(h.plugin.cache.books, books);
+    assert.equal(writes.length, 1); assert.match(writes[0].path, /\.check\..+\.tmp$/);
+    assert.equal(JSON.parse(writes[0].text).snapshot, snapshot);
+    const checked = h.plugin.lastChecked;
+    await h.plugin.loadCache(); assert.equal(h.plugin.lastChecked, checked);
+    assert.deepEqual(h.plugin.cache.books, books);
+    const rename = storage.rename.bind(storage);
+    storage.rename = async (from, to) => {
+        if (from.endsWith('.tmp') && to.endsWith('.check')) throw new Error('controlled metadata promotion failure');
+        await rename(from, to);
+    };
+    await h.plugin.refresh(); assert.equal(h.plugin.libraryPhase, 'error');
+    storage.rename = rename;
+    await h.plugin.loadCache(); assert.equal(h.plugin.lastChecked, checked);
+    assert.deepEqual(h.plugin.cache.books, books);
+    await storage.remove(h.plugin.cachePath(h.plugin.cache.source));
+    await h.plugin.refresh(); await h.plugin.loadCache();
+    assert.deepEqual(h.plugin.cache.books, books);
+    dav.state.body = xml('');
+    await h.plugin.refresh();
+    assert.match(h.plugin.librarySummary, /1 books removed/);
+    await h.plugin.loadCache();
+    assert.equal(h.plugin.lastChecked, h.plugin.cache.checkedAt);
+});
+
+test('partial sync with no cached books never becomes a confirmed empty remote folder after reload', async t => {
+    const h = await harness(t), dav = await server(t);
+    await connected(h, dav); dav.state.getStatus = 403;
+    await h.plugin.refresh();
+    assert.match(h.plugin.status, /Authentication or access denied/);
+    await h.plugin.loadCache(); h.plugin.openLibrary(false);
+    assert.match(h.plugin.browser.empty.textContent, /No locally cached books/);
+});
+
+test('changing book with arrow keys preserves other rows and points to the selected option', async t => {
+    const h = await harness(t);
+    h.plugin.cache.books = ['A', 'B', 'C'].map(name => ({ ...book, bookName: name, fileHref: name + '.an' }));
+    h.plugin.openLibrary(false);
+    const modal = h.plugin.browser;
+    const rows = [...modal.contentEl.querySelectorAll('[role=option]')];
+    modal.inputEl.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    assert.deepEqual([...modal.contentEl.querySelectorAll('[role=option]')].map((row, i) => row === rows[i]), [true, true, true]);
+    assert.equal(modal.inputEl.getAttribute('aria-activedescendant'), rows[1].id);
+    assert.equal(modal.contentEl.querySelector('[aria-selected=true]'), rows[1]);
+});
+
+test('compact picker keeps the query and selection while toggling between list and preview', async t => {
+    const h = await harness(t), modal = await openImport(h);
+    const workspace = modal.contentEl.querySelector('.moonreader-workspace');
+    const toggle = workspace.querySelector('.moonreader-switch-book');
+    assert.equal(workspace.dataset.picker, 'closed');
+    toggle.click();
+    change(h, modal.inputEl, 'Synthetic');
+    modal.contentEl.querySelector('[role=option]').click();
+    assert.equal(workspace.dataset.picker, 'closed');
+    toggle.click(); assert.equal(modal.inputEl.value, 'Synthetic');
+    assert.equal(modal.contentEl.querySelector('[aria-selected=true]').title, book.bookName);
+    h.plugin.cache.books = []; h.plugin.notify();
+    assert.equal(workspace.dataset.picker, 'open');
+    assert.equal(modal.contentEl.querySelector('.moonreader-import-actions .mod-cta').disabled, true);
+});
+
+test('saved connection folds in full settings and partial results expose failure details directly', async t => {
+    const h = await harness(t), dav = await server(t);
+    await connected(h, dav);
+    const tab = settings(h), disclosure = tab.containerEl.querySelector('.moonreader-saved-connection');
+    assert.ok(disclosure); assert.equal(disclosure.open, false);
+    assert.ok(disclosure.querySelector('summary').textContent.includes('reader'));
+    assert.ok(!disclosure.contains(input(tab.containerEl, 'Books shown')));
+    dav.state.getStatus = 403; h.plugin.openLibrary(); await until(() => !h.plugin.syncing);
+    const root = h.plugin.browser.contentEl;
+    const failed = root.querySelector('button[aria-expanded][type=button]') || [...root.querySelectorAll('button')].find(el => el.textContent.includes('updates failed'));
+    const link = [...root.querySelectorAll('button')].find(el => el.textContent.includes('updates failed'));
+    assert.ok(failed && link); link.click();
+    assert.ok(root.querySelector('.moonreader-source').open);
+    assert.match(root.querySelector('.moonreader-source-info').textContent, /Authentication or access denied/);
+    tab.hide();
 });

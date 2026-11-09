@@ -33,7 +33,7 @@ Back up annotations to WebDAV from Moon+ Reader and locate the folder containing
 1. In the plugin settings, enter the **WebDAV folder URL** and **Username**.
 2. Choose an entry from **Saved Keychains**, or select **New Keychain** and enter a name and password or app password.
 3. Optionally select **Test connection**; testing does not save anything. Apply the connection with **Verify and save connection**, or **Create Keychain and save connection** for a new entry.
-4. Open the library from the ribbon button or the **Browse and import notes** command. An empty cache is fetched automatically; use **Refresh library** for later updates.
+4. Open the library from the ribbon button or the **Browse and import notes** command. Each time the plugin starts, the first library open shows the saved books immediately and checks the configured backup in the background. Reopening the library uses that result, including an empty folder or a failed check. Use **Refresh** or **Retry** to check again. Select the server name to inspect the backup folder, last check time and reasons for individual failures. If a background check removes the selected book, select another book before importing. Checks that leave the cached books unchanged save only a small timestamp record.
 
 Keychain names accept lowercase letters, numbers and dashes, up to 64 characters. Existing names cannot be overwritten. Changing the account or server requires choosing a credential again. Manage existing entries in Obsidian Keychain.
 
@@ -47,7 +47,7 @@ Select a book to preview its first three sorted annotations. Choose **Preview al
 
 - The default inserts at the cursor captured when the panel opened, without replacing selected text. If another pane has focus, it uses the most recent Markdown note still open.
 - With no open destination, use **Choose note**, select a Markdown file, then append.
-- **More** lets you append, change the destination, or replace the body. Replacement requires confirmation and preserves leading YAML properties.
+- Click the destination path to change files. The adjacent mode menu selects cursor insertion, append, or replacement. In a narrow window, use **Switch book** to reopen the list. Replacement requires confirmation and preserves leading YAML properties.
 - Arrow keys select books, Enter focuses the import button, and Ctrl/Cmd+Enter imports. Shortcuts cannot bypass confirmation.
 
 Importing the same book into the same note again requires confirmation during one plugin session. **There is no deduplication across sessions or two-way sync**; repeated imports may duplicate content and block IDs. Remote backups are never modified. Closing during a write waits for it to finish.
