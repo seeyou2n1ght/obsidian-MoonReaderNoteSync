@@ -28,11 +28,11 @@ export function sortPreference(plugin: MoonReaderSyncPlugin, owner: Component, d
     } else {
         for (const [sort, direction, label] of bookOrderOptions()) dropdown.addOption(sort + '/' + direction, label);
     }
-    const sync = () => dropdown.setValue(current());
+    const sync = (): void => { dropdown.setValue(current()); };
     sync();
     plugin.listeners.add(sync);
-    owner.register(() => plugin.listeners.delete(sync));
-    dropdown.onChange(async value => {
+    owner.register(() => { plugin.listeners.delete(sync); });
+    const saveOrder = async (value: string) => {
         if (dropdown.selectEl.disabled || current() === value) return;
         dropdown.setDisabled(true);
         onSaving(true);
@@ -51,5 +51,6 @@ export function sortPreference(plugin: MoonReaderSyncPlugin, owner: Component, d
             feedback.setText(t('排序未保存，仍使用「', 'Order was not saved. Current order: ') +
                 dropdown.selectEl.selectedOptions[0].text + t('」。', '. ') + errorMessage(error));
         } finally { sync(); dropdown.setDisabled(false); onSaving(false); }
-    });
+    };
+    dropdown.onChange(value => { void saveOrder(value); });
 }

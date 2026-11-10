@@ -61,9 +61,10 @@ export function readCheckTime(storage: CacheStorage, path: string, snapshot: str
         const marker = path + '.check';
         await recoverCache(storage, marker);
         if (!await storage.exists(marker)) return snapshot;
-        const data = JSON.parse(await storage.read(marker));
-        return data?.snapshot === snapshot && typeof data.checkedAt === 'string' && Number.isFinite(Date.parse(data.checkedAt))
-            ? data.checkedAt as string : snapshot;
+        const data: unknown = JSON.parse(await storage.read(marker));
+        if (data === null || typeof data !== 'object' || !('snapshot' in data) || data.snapshot !== snapshot ||
+            !('checkedAt' in data) || typeof data.checkedAt !== 'string') return snapshot;
+        return Number.isFinite(Date.parse(data.checkedAt)) ? data.checkedAt : snapshot;
     });
 }
 async function replaceText(storage: CacheStorage, path: string, text: string): Promise<void> {
