@@ -4,6 +4,7 @@ export interface MoonReaderNote {
     id: string;
     bookName: string;
     chapter: string;
+    offset?: number;
     colorHex: string;
     timestamp: string;
     note: string;
@@ -60,6 +61,7 @@ export class AnParser {
                     notes.push({
                         bookName: bookName || "Unknown",
                         chapter: chapter.toString(),
+                        offset,
                         highlightText: highlightText,
                         note: note,
                         colorHex: AnParser.argbToHex(colorInt.toString()),
@@ -67,9 +69,9 @@ export class AnParser {
                         id: annId.toString()
                     });
                 }
-            } catch {
+            } catch (error) {
                 // Never silently publish a partial book over a complete cache.
-                throw new Error(`Invalid annotation record at line ${idx + 1}`);
+                throw new Error(`Invalid annotation record at line ${idx + 1}`, { cause: error });
             }
             
             idx += 17;
@@ -82,8 +84,8 @@ export class AnParser {
     private static inflateBuffer(buffer: ArrayBuffer): string {
         try {
             return pako.inflate(new Uint8Array(buffer), { to: 'string' });
-        } catch {
-            throw new Error('Cannot decompress annotation file');
+        } catch (error) {
+            throw new Error('Cannot decompress annotation file', { cause: error });
         }
     }
 

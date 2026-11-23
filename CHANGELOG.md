@@ -1,4 +1,23 @@
-# 更新记录
+# 更新记录 / Changelog
+
+## 0.6.0
+
+### Highlights / 主要更新
+
+- **Preview & Library UI / 预览与书库体验**
+  - Replaced the floating sticky header with a fixed reading-pane toolbar and independent scrollable preview body, and stabilized the modal height so expanding from the first 3 notes to all notes no longer jumps. / 预览区改为固定顶栏与独立滚动正文区，固定弹窗高度，彻底消除展开全部时的跳动与标题栏漂浮感。
+  - Added an inline preview status indicator, a bottom "Show all notes" prompt below the first 3 notes, unified text buttons in the top bar, toned down secondary accent colors, and separated the template editor into a card with `Hide template` toggle state, modified indicator, local status feedback, `Reset to default`, and a `{#note}` quick-insert button. / 优化顶栏与模板区层次，统一文字按钮样式，底部新增顺手展开提示、模板未保存标识、恢复默认与 `{#note}` 快捷按钮。
+  - Settings page: WebDAV URL now spans full width, removed the stray top border above Username in Obsidian 1.15, and removed the duplicated prefix in the collapsed connection summary. / 修复设置页长 URL 截断、`Username` 上方多余分割线及折叠标题重复前缀。
+- **Templates, Rendering & Sorting / 模板渲染与排序**
+  - Automatically separate adjacent notes with a blank line (`\n\n`) when a rendered entry lacks a trailing newline, fixing Markdown blockquotes (`>`) merging into the previous note. / 多条笔记拼接时缺尾换行自动补 `\n\n`，修复引用块与上一段批注粘连导致渲染失败。
+  - Added `{#field}...{/field}` conditional blocks (adopted in the default template to omit empty note lines) and Moon+ Reader `<BR>` line-break decoding (preserving `>` prefixes inside blockquotes and `<br>` inside inline HTML tags). / 支持 `{#field}...{/field}` 条件块与静读天下 `<BR>` 换行还原（自动适配引用续行与内联 HTML）。
+  - Preserved `offset` from `.an` records so chapter sorting orders notes accurately by reading position within each chapter (with graceful fallback for legacy cache). / 保留 `.an` 中的 `offset`，按章节排序时同章内按真实阅读位置排列。
+- **Import Flow, Sync & Reliability / 导入、同步与稳定性**
+  - Added direct new-note creation from the target note picker (defaulting to the selected book title, with filename sanitization and Windows reserved-name protection). / 目标笔记选择器支持直接新建笔记（默认建议书名，内置非法字符与 Windows 保留名保护）。
+  - Improved keyboard & popover handling (`Esc` and outside click close the server details popover; `Ctrl/Cmd+Enter` is ignored while typing in the template editor; `Switch book` is disabled during writes) and synchronized default template saves from Settings to an open library. / 完善 `Esc`/点击外部关闭详情浮层、模板编辑区防误触导入、写入期间禁用切书按钮及设置页保存模板实时同步。
+  - Upgraded WebDAV annotation downloads to bounded concurrency (4), propagated `AbortController` on unload/connection change, fixed percent-encoded Chinese book names in failure reports, suppressed late rejected `requestUrl` promises, and included HTTP status codes and parse line diagnostics. / 同步升级为有限并发下载并传导取消信号，修复失败列表中文书名解码与迟到 Promise 拒绝，补充 HTTP 状态码和解析行号诊断。
+- **Engineering & Release / 工程与发版**
+  - Extracted `ConnectionSection`, modernized `tsconfig`/`esbuild` to `ES2022`, added `eslint` + `eslint-plugin-obsidianmd`, split integration tests by domain, added real Markdown (`marked`) and headless Chrome CSS layout smoke tests, and extracted single-version release notes via `scripts/release-notes.mjs`. / 拆分连接表单模块，升级至 `ES2022`，接入 `eslint-plugin-obsidianmd`、真实 Markdown 与无头浏览器布局冒烟测试，发布流程仅提取当版更新说明。
 
 ## 0.5.1
 

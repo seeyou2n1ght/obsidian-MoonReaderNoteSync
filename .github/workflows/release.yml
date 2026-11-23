@@ -39,6 +39,11 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: npm run check:release -- "$RELEASE_TAG"
 
+      - name: Extract release notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/release-notes.mjs "$RELEASE_TAG" --out release-notes.md
+
       - name: Attest release assets
         uses: actions/attest@v4
         with:
@@ -51,7 +56,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           fail_on_unmatched_files: true
-          body_path: CHANGELOG.md
+          body_path: release-notes.md
           files: |
             main.js
             manifest.json

@@ -5,6 +5,8 @@ import { bookOrderOptions } from './sortPreference';
 import { ImportPanel } from './importPanel';
 import { t, errorMessage } from '../i18n';
 
+const titleCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
 export class BookSuggestModal extends Modal {
     inputEl!: HTMLInputElement;
     private owner = new Component();
@@ -56,7 +58,7 @@ export class BookSuggestModal extends Modal {
             if (!this.plugin.configured() || this.plugin.libraryPhase === 'auth') this.plugin.openConnectionSettings();
             else void this.plugin.refresh();
         });
-        this.settingsButton = new ButtonComponent(toolbar).setIcon('settings').setTooltip(t('连接设置', 'Connection settings')).onClick(() => this.plugin.openConnectionSettings());
+        this.settingsButton = new ButtonComponent(toolbar).setButtonText(t('设置', 'Settings')).setTooltip(t('连接设置', 'Connection settings')).onClick(() => this.plugin.openConnectionSettings());
         this.progress = this.contentEl.createEl('progress', { cls: 'moonreader-check-progress', attr: { 'aria-label': t('书库检查进度', 'Library check progress') } });
         const workspace = this.contentEl.createDiv({ cls: 'moonreader-workspace' });
         this.workspace = workspace;
@@ -74,7 +76,7 @@ export class BookSuggestModal extends Modal {
         this.bookOrder.buttonEl.setAttribute('aria-haspopup', 'menu');
         this.list = sidebar.createDiv({ cls: 'moonreader-book-list', attr: { role: 'listbox', 'aria-label': t('书籍', 'Books') } });
         const right = workspace.createDiv({ cls: 'moonreader-reading' });
-        this.reading = right.createDiv();
+        this.reading = right.createDiv({ cls: 'moonreader-reading-panel' });
         this.empty = right.createDiv({ cls: 'moonreader-empty' });
         const footer = this.contentEl.createDiv({ cls: 'moonreader-footer' });
         this.panel = this.owner.addChild(new ImportPanel(this.app, this.plugin, this.reading, footer, this.view, () => this.close(), () => {
@@ -87,11 +89,25 @@ export class BookSuggestModal extends Modal {
             this.needsSelection = false;
             this.renderBooks();
         });
+        this.modalEl.addEventListener('click', event => {
+            const target = event.target as Node | null;
+            if (this.sourceDetails.open && target && !this.sourceDetails.contains(target) && !this.failureDetails.buttonEl.contains(target)) {
+                this.sourceDetails.open = false;
+            }
+        });
         this.modalEl.addEventListener('keydown', event => {
-            if (event.key === 'Escape' && (this.panel.busy || this.panel.dismissSecondary())) {
-                event.preventDefault(); event.stopImmediatePropagation(); return;
+            if (event.key === 'Escape') {
+                if (this.sourceDetails.open) {
+                    this.sourceDetails.open = false;
+                    event.preventDefault(); event.stopImmediatePropagation(); return;
+                }
+                if (this.panel.busy || this.panel.dismissSecondary()) {
+                    event.preventDefault(); event.stopImmediatePropagation(); return;
+                }
             }
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                const target = event.target as { tagName?: string } | null;
+                if (target?.tagName === 'TEXTAREA') return;
                 event.preventDefault(); event.stopPropagation(); void this.panel.submit(); return;
             }
             if (event.target === this.inputEl || this.list.contains(event.target as Node)) {
@@ -104,6 +120,7 @@ export class BookSuggestModal extends Modal {
         let limit = this.plugin.settings.bookListLimit;
         let sort = this.plugin.settings.bookListSort;
         let noteOrder = this.plugin.settings.noteOrder;
+        let noteTemplate = this.plugin.settings.noteTemplate;
         let direction = this.plugin.settings.bookListDirection;
         const update = this.updateLibrary = () => {
             this.updateConnectionBar();
@@ -111,6 +128,10 @@ export class BookSuggestModal extends Modal {
             this.refreshButton.setDisabled(this.plugin.syncing || this.plugin.connectionSaving || this.panel.busy);
             if (this.panel.busy) return;
             const cacheChanged = books !== this.plugin.cache.books;
+            if (noteTemplate !== this.plugin.settings.noteTemplate) {
+                noteTemplate = this.plugin.settings.noteTemplate;
+                this.panel.syncDefaultTemplate();
+            }
             if (cacheChanged || limit !== this.plugin.settings.bookListLimit || sort !== this.plugin.settings.bookListSort || direction !== this.plugin.settings.bookListDirection) {
                 books = this.plugin.cache.books; limit = this.plugin.settings.bookListLimit;
                 sort = this.plugin.settings.bookListSort; direction = this.plugin.settings.bookListDirection;
@@ -144,8 +165,11 @@ export class BookSuggestModal extends Modal {
         this.detailText.setText([url?.host, url?.pathname, checked, this.plugin.status].filter(Boolean).join('\n'));
         const setup = !configured || phase === 'auth';
         const retry = phase === 'partial' || phase === 'error';
-        const action = !configured && !settings.secretId ? t('连接备份', 'Connect backup') : setup ? t('检查凭据', 'Check credentials') :
-            syncing ? t('检查中', 'Checking') : retry ? t('重试', 'Retry') : t('刷新', 'Refresh');
+        let action = t('刷新', 'Refresh');
+        if (!configured && !settings.secretId) action = t('连接备份', 'Connect backup');
+        else if (setup) action = t('检查凭据', 'Check credentials');
+        else if (syncing) action = t('检查中', 'Checking');
+        else if (retry) action = t('重试', 'Retry');
         this.refreshButton.setButtonText(action);
         this.refreshButton.setTooltip(setup || retry ? action : t('刷新书库', 'Refresh library'));
         this.settingsButton.buttonEl.hidden = setup;
@@ -198,8 +222,7 @@ export class BookSuggestModal extends Modal {
         if (this.panel.busy || this.disposed) return;
         const query = this.inputEl.value.trim().toLocaleLowerCase();
         const matched = this.plugin.cache.books.filter(book => book.bookName.toLocaleLowerCase().includes(query));
-        const titles = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
-        const titleOrder = (a: BookItem, b: BookItem) => titles.compare(a.bookName, b.bookName) || a.fileHref.localeCompare(b.fileHref);
+        const titleOrder = (a: BookItem, b: BookItem) => titleCollator.compare(a.bookName, b.bookName) || a.fileHref.localeCompare(b.fileHref);
         const modified = (book: BookItem) => { const date = Date.parse(book.lastModified || ''); return Number.isFinite(date) ? date : -Infinity; };
         matched.sort((a, b) => {
             if (this.plugin.settings.bookListSort === 'title') return titleOrder(a, b) * (this.plugin.settings.bookListDirection === 'asc' ? 1 : -1);
@@ -261,13 +284,25 @@ export class BookSuggestModal extends Modal {
     }
     private renderEmpty(filtered: boolean) {
         const { syncing, libraryPhase: phase } = this.plugin;
-        const message = this.needsSelection && this.shownBooks.length ? t('原选书籍已不在当前列表，请重新选择。', 'The selected book is no longer listed. Choose a book to import.') : filtered ? t('试试其他关键词。', 'Try another search.') :
-            syncing ? t('正在读取阅读备份…', 'Fetching your reading backup…') :
-            !this.plugin.configured() ? t('连接备份后，这里会出现你的书籍。', 'Connect your backup to see your books here.') :
-            phase === 'error' || phase === 'auth' || phase === 'partial' ? t('暂无可用书籍，请查看上方检查结果。', 'No books available. See the check result above.') :
-            phase === 'ready' ? t('备份目录中没有书籍，请检查备份位置。', 'No books in the backup folder. Check the location.') : t('本地暂无可用书籍。', 'No locally cached books.');
+        let heading = t('你的阅读笔记', 'Your reading notes');
+        let message = t('本地暂无可用书籍。', 'No locally cached books.');
+        if (this.needsSelection && this.shownBooks.length) {
+            heading = t('请选择书籍', 'Choose a book');
+            message = t('原选书籍已不在当前列表，请重新选择。', 'The selected book is no longer listed. Choose a book to import.');
+        } else if (filtered) {
+            heading = t('没有匹配的书籍', 'No matching books');
+            message = t('试试其他关键词。', 'Try another search.');
+        } else if (syncing) {
+            message = t('正在读取阅读备份…', 'Fetching your reading backup…');
+        } else if (!this.plugin.configured()) {
+            message = t('连接备份后，这里会出现你的书籍。', 'Connect your backup to see your books here.');
+        } else if (phase === 'error' || phase === 'auth' || phase === 'partial') {
+            message = t('暂无可用书籍，请查看上方检查结果。', 'No books available. See the check result above.');
+        } else if (phase === 'ready') {
+            message = t('备份目录中没有书籍，请检查备份位置。', 'No books in the backup folder. Check the location.');
+        }
         this.empty.empty();
-        this.empty.createEl('h3', { text: this.needsSelection && this.shownBooks.length ? t('请选择书籍', 'Choose a book') : filtered ? t('没有匹配的书籍', 'No matching books') : t('你的阅读笔记', 'Your reading notes') });
+        this.empty.createEl('h3', { text: heading });
         this.empty.createEl('p', { text: message });
     }
     private moveSelection(delta: number) {
@@ -282,6 +317,7 @@ export class BookSuggestModal extends Modal {
     }
     private updateBusy() {
         this.inputEl.disabled = this.panel.busy;
+        this.switchBook.setDisabled(this.panel.busy);
         this.bookOrder.setDisabled(this.panel.busy || this.savingOrder);
         if (this.panel.busy) this.orderMenu?.hide();
         this.list.querySelectorAll<HTMLButtonElement>('button').forEach(el => el.disabled = this.panel.busy);

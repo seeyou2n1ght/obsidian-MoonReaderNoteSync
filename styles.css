@@ -1,151 +1,765 @@
 /* Layout uses Obsidian theme variables; buttons, menus, modals and settings are native. */
-.moonreader-library { width: min(900px, 94vw); max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; }
-.moonreader-library > .modal-title, .moonreader-library > h2 { flex-shrink: 0; }
-.moonreader-library .modal-content { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; }
-.moonreader-library-toolbar { display: flex; flex-wrap: wrap; flex-shrink: 0; align-items: center; gap: 8px; margin: -4px 0 16px; }
-.moonreader-library-toolbar > .moonreader-meta { flex: 1 1 160px; }
-.moonreader-library-toolbar button { padding: 6px; box-shadow: none; background: transparent; border: 0; }
-.moonreader-workspace { display: grid; grid-template-columns: minmax(190px, 28%) minmax(0, 1fr); min-height: 330px; height: min(480px, 55vh); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); overflow: hidden; }
-.moonreader-sidebar { display: flex; flex-direction: column; min-height: 0; padding: 12px; background: var(--background-secondary); border-right: 1px solid var(--background-modifier-border); }
-.moonreader-sidebar input { width: 100%; flex-shrink: 0; }
-.moonreader-list-order { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-shrink: 0; }
-.moonreader-list-order > .moonreader-meta { flex: 1; min-width: 0; white-space: nowrap; }
-.moonreader-list-order button { background: transparent; box-shadow: none; border: 0; font-size: var(--font-ui-small); padding: 4px; height: auto; }
-.moonreader-book-list { overflow-y: auto; margin-top: 10px; }
-.moonreader-library button.moonreader-book-item { display: flex; align-items: center; width: 100%; gap: 8px; text-align: left; height: auto; min-height: 42px; padding: 8px; margin: 2px 0; border: 0; background: transparent; box-shadow: none; white-space: normal; }
-.moonreader-book-item > span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.moonreader-library button.moonreader-book-item:hover { background: var(--background-modifier-hover); }
-.moonreader-library button.moonreader-book-item[aria-selected="true"] { background: var(--background-modifier-active-hover); }
-.moonreader-book-error { color: var(--text-warning); }
-.moonreader-reading { min-width: 0; overflow-y: auto; padding: 24px; }
-.moonreader-book-title { margin: 0 0 6px; overflow-wrap: anywhere; }
-.moonreader-meta { color: var(--text-muted); font-size: var(--font-ui-small); overflow-wrap: anywhere; }
-.moonreader-preview { border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); padding: 12px 16px; overflow-wrap: anywhere; margin: 12px 0; }
-.moonreader-book-preview { border: 0; padding: 0; margin: 22px 0; }
-.moonreader-preview > :first-child, .moonreader-preview .markdown-rendered > :first-child { margin-top: 0; }
-.moonreader-template-details { margin-top: 24px; }
-.moonreader-preview-toolbar { position: sticky; top: 0; z-index: 1; padding: 6px 0; background: var(--background-primary); }
-.moonreader-preview-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.moonreader-preview-controls select { max-width: 100%; }
-.moonreader-template-textarea { width: 100%; min-height: 110px; resize: vertical; font-family: var(--font-monospace); }
-.moonreader-field-hint { margin: 10px 0 6px; }
-.moonreader-fields { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-.moonreader-fields button { height: auto; padding: 5px 8px; gap: 6px; font-size: var(--font-ui-smaller); box-shadow: none; }
-.moonreader-fields button span { color: var(--text-muted); }
-.moonreader-fields code { font-size: inherit; }
-.moonreader-footer { flex-shrink: 0; padding-top: 14px; }
-.moonreader-import-actions { display: flex; align-items: center; gap: 8px; }
-.moonreader-destination { flex: 1; min-width: 0; font-size: var(--font-ui-small); overflow-wrap: anywhere; }
-.moonreader-destination .moonreader-meta { margin-top: 3px; }
-.moonreader-destination button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.moonreader-status { line-height: 1.5; overflow-wrap: anywhere; }
-.moonreader-connection-group { container: moonreader-connection / inline-size; }
-.moonreader-connection-card { display: grid; grid-template-columns: minmax(0, 2fr) minmax(160px, 1fr); gap: 18px; padding: 18px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); }
-@container moonreader-connection (max-width: 520px) { .moonreader-connection-card { grid-template-columns: minmax(0, 1fr); } }
-.moonreader-settings .moonreader-connection-card > .setting-item:not(.setting-item-heading) { border: 0; padding: 0; margin: 0; }
-.moonreader-connection-field { flex-direction: column; align-items: stretch; gap: 8px; }
-.moonreader-connection-field .setting-item-info { flex: 1; min-width: 0; margin-right: 0; }
-.moonreader-connection-field .setting-item-control { width: 100%; flex: 0 0 auto; }
-.moonreader-connection-card .moonreader-connection-field input[type="text"] { width: 100%; }
-.moonreader-connection-card .moonreader-keychain, .moonreader-connection-card .moonreader-connection-actions { grid-column: 1 / -1; }
-.moonreader-connection-card .moonreader-credential-controls { padding: 0; border: 0; border-radius: 0; }
-.moonreader-settings .moonreader-connection-card > .setting-item.moonreader-keychain { padding-top: 16px; border-top: 1px solid var(--background-modifier-border); }
-.moonreader-settings .moonreader-connection-card > .setting-item.moonreader-connection-actions { padding-top: 14px; border-top: 1px solid var(--background-modifier-border); }
-.moonreader-connection-card .moonreader-connection-actions .setting-item-info { display: none; }
-.moonreader-connection-card .moonreader-connection-actions .setting-item-control { width: 100%; gap: 8px; justify-content: flex-end; }
-.moonreader-connection-card .moonreader-connection-actions .moonreader-status { order: -1; text-align: left; margin: 0 0 4px; }
-.moonreader-connection-card .moonreader-status[data-state="dirty"] { color: var(--text-warning); }
-.moonreader-connection-card .moonreader-status[data-state="error"] { color: var(--text-error); }
-.moonreader-preference-feedback { margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-small); }
-.moonreader-preference-feedback:empty { display: none; }
-.moonreader-back-to-library .setting-item-info { display: none; }
-.moonreader-keychain { flex-direction: column; align-items: stretch; gap: 12px; }
-.moonreader-keychain .setting-item-control { width: 100%; justify-content: flex-start; }
-.moonreader-credential-controls { display: flex; flex-direction: column; gap: 12px; min-width: 0; width: 100%; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); text-align: left; }
-.moonreader-credential { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.moonreader-credential-heading { display: flex; align-items: center; gap: 10px; font-size: var(--font-ui-small); }
-.moonreader-credential-name { overflow-wrap: anywhere; white-space: normal; font-size: var(--font-ui-smaller); }
-.moonreader-existing-credential { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
-.moonreader-new-password { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.moonreader-existing-credential select { width: 100%; min-width: min(100%, 220px); max-width: 100%; }
-.moonreader-new-password label { display: flex; flex-direction: column; gap: 6px; font-size: var(--font-ui-small); width: 100%; }
-.moonreader-new-password input { width: 100%; }
-.moonreader-connection-card .moonreader-new-password input[type="text"], .moonreader-connection-card .moonreader-new-password input[type="password"] { width: 100%; }
-.moonreader-credential-help { color: var(--text-muted); font-size: var(--font-ui-smaller); text-align: left; }
-.moonreader-credential-name-error { color: var(--text-error); font-size: var(--font-ui-small); text-align: left; }
-.moonreader-credential-name-error:empty { display: none; }
-.moonreader-new-password input[aria-invalid="true"] { border-color: var(--text-error); }
-.moonreader-settings [hidden] { display: none; }
-.moonreader-import-feedback { display: flex; align-items: center; gap: 8px; }
-.moonreader-import-feedback .moonreader-status { flex: 1; font-size: var(--font-ui-small); }
-.moonreader-import-feedback .moonreader-status:empty { display: none; }
-.moonreader-import-feedback .moonreader-status:not(:empty), .moonreader-import-feedback button:not([hidden]) { margin-bottom: 10px; }
-.moonreader-confirmation { border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); padding: 12px; margin-bottom: 12px; display: flex; gap: 8px; align-items: center; }
-.moonreader-confirmation p { margin: 0 auto 0 0; font-size: var(--font-ui-small); }
-.moonreader-confirmation[hidden], .moonreader-library [hidden] { display: none; }
-.moonreader-warning { color: var(--text-warning); font-size: var(--font-ui-small); margin-top: 8px; }
-.moonreader-warning:empty { display: none; }
-.moonreader-connection-status { color: var(--text-muted); font-size: var(--font-ui-small); }
-.moonreader-settings .moonreader-status[data-state="tested"] { color: var(--text-warning); }
-.moonreader-empty { padding: 50px 16px; text-align: center; color: var(--text-muted); }
-.moonreader-settings input[type="text"], .moonreader-settings input[type="password"] { width: min(320px, 100%); }
-.moonreader-connection-actions .setting-item-control { flex-wrap: wrap; }
-.moonreader-connection-actions .moonreader-status { flex-basis: 100%; text-align: right; }
-.moonreader-template-setting { flex-direction: column; align-items: stretch; }
-.moonreader-template-setting .setting-item-control { display: block; text-align: left; }
-.moonreader-connection { width: min(760px, 94vw); }
-.moonreader-settings .moonreader-status { font-size: var(--font-ui-small); color: var(--text-muted); margin: 12px 0; }
-.moonreader-settings-template { margin-top: 8px; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
-.moonreader-settings-template[open] summary { margin-bottom: 16px; }
-.moonreader-settings-template > button { display: block; margin-left: auto; }
-.moonreader-settings summary, .moonreader-library summary { cursor: pointer; }
-@media (max-width: 650px) {
-    .moonreader-workspace { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); height: 54vh; min-height: 250px; }
-    .moonreader-sidebar { border-right: 0; border-bottom: 1px solid var(--background-modifier-border); }
-    .moonreader-reading { padding: 16px; }
-    .moonreader-import-actions { flex-wrap: wrap; }
-    .moonreader-destination { flex-basis: 100%; }
-    .moonreader-import-actions button:first-of-type { margin-left: auto; }
-    .moonreader-confirmation { flex-wrap: wrap; }
-    .moonreader-confirmation p { flex-basis: 100%; }
-    .moonreader-settings .setting-item { flex-direction: column; align-items: stretch; gap: 8px; }
-    .moonreader-settings .setting-item-control { justify-content: flex-start; }
-    .moonreader-settings input[type="text"], .moonreader-settings input[type="password"] { width: 100%; }
+
+/* Library modal & connection bar */
+.moonreader-library {
+    width: min(920px, 94vw);
+    height: min(760px, 84vh);
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.moonreader-library > .modal-title,
+.moonreader-library > h2 {
+    flex-shrink: 0;
+}
+.moonreader-library .modal-content {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+.moonreader-library-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 8px;
+    margin: -4px 0 16px;
+}
+.moonreader-library-toolbar > .moonreader-meta {
+    flex: 1 1 160px;
+}
+.moonreader-library-toolbar button {
+    height: auto;
+    padding: 4px 8px;
+    border-radius: var(--radius-s);
+    box-shadow: none;
+    background: transparent;
+    border: 0;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+.moonreader-library-toolbar button:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+.moonreader-library-toolbar [data-phase]::before {
+    content: '◷';
+    margin-right: 6px;
+}
+.moonreader-library-toolbar [data-phase="ready"]::before {
+    content: '✓';
+    color: var(--text-success);
+}
+.moonreader-library-toolbar [data-phase="checking"]::before {
+    content: '↻';
+}
+.moonreader-library-toolbar :is([data-phase="auth"], [data-phase="error"], [data-phase="partial"])::before {
+    content: '⚠';
+    color: var(--text-warning);
+}
+.moonreader-source {
+    position: relative;
+    max-width: 100%;
+}
+.moonreader-source summary {
+    overflow-wrap: anywhere;
+    cursor: pointer;
+}
+.moonreader-source-info {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 3;
+    width: max-content;
+    max-width: min(340px, 72vw);
+    max-height: 40vh;
+    overflow: auto;
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    background: var(--background-primary);
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+    font-size: var(--font-ui-small);
+}
+.moonreader-check-progress {
+    width: 100%;
+    height: 3px;
+    margin: -8px 0 8px;
+    flex-shrink: 0;
 }
 
-.moonreader-saved-label { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: min(100%, 220px); font-size: var(--font-ui-small); }
-.moonreader-selection-hint { flex-basis: 100%; color: var(--text-muted); font-size: var(--font-ui-small); }
-.moonreader-selection-hint[data-empty="true"] { flex-basis: auto; order: -1; }
-.moonreader-credential-warning { color: var(--text-warning); font-size: var(--font-ui-small); }
-.moonreader-test-action { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.moonreader-test-hint { color: var(--text-muted); font-size: var(--font-ui-smaller); }
-.moonreader-connection-card .moonreader-connection-actions .setting-item-control { align-items: flex-start; }
+/* Workspace & book sidebar */
+.moonreader-workspace {
+    display: grid;
+    grid-template-columns: minmax(190px, 28%) minmax(0, 1fr);
+    flex: 1;
+    min-height: 0;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    overflow: hidden;
+}
+.moonreader-library .moonreader-switch-book {
+    display: none;
+}
+.moonreader-sidebar {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 12px;
+    background: var(--background-secondary);
+    border-right: 1px solid var(--background-modifier-border);
+}
+.moonreader-sidebar input {
+    width: 100%;
+    flex-shrink: 0;
+}
+.moonreader-list-order {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0;
+    flex-shrink: 0;
+}
+.moonreader-list-order > .moonreader-meta {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+}
+.moonreader-list-order button {
+    background: transparent;
+    box-shadow: none;
+    border: 0;
+    font-size: var(--font-ui-small);
+    padding: 4px;
+    height: auto;
+}
+.moonreader-book-list {
+    overflow-y: auto;
+    margin-top: 10px;
+}
+.moonreader-library button.moonreader-book-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 8px;
+    text-align: left;
+    height: auto;
+    min-height: 42px;
+    padding: 8px;
+    margin: 2px 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    white-space: normal;
+}
+.moonreader-book-item > span:first-child {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+}
+.moonreader-library button.moonreader-book-item:hover {
+    background: var(--background-modifier-hover);
+}
+.moonreader-library button.moonreader-book-item[aria-selected="true"] {
+    background: var(--background-modifier-active-hover);
+    box-shadow: inset 3px 0 var(--interactive-accent);
+}
+.moonreader-book-error {
+    color: var(--text-warning);
+}
 
-.moonreader-source { position: relative; max-width: 100%; }
-.moonreader-source summary { overflow-wrap: anywhere; cursor: pointer; }
-.moonreader-source-info { position: absolute; top: 100%; left: 0; z-index: 3; width: max-content; max-width: min(340px, 72vw); padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); white-space: pre-line; overflow-wrap: anywhere; font-size: var(--font-ui-small); }
-.moonreader-library-toolbar [data-phase]::before { content: '◷'; margin-right: 6px; }
-.moonreader-library-toolbar [data-phase="ready"]::before { content: '✓'; color: var(--text-success); }
-.moonreader-library-toolbar [data-phase="checking"]::before { content: '↻'; }
-.moonreader-library-toolbar :is([data-phase="auth"], [data-phase="error"], [data-phase="partial"])::before { content: '⚠'; color: var(--text-warning); }
-.moonreader-check-progress { width: 100%; height: 3px; margin: -8px 0 8px; flex-shrink: 0; }
+/* Reading & preview pane */
+.moonreader-reading {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+.moonreader-reading-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+.moonreader-preview-toolbar {
+    flex-shrink: 0;
+    padding: 14px 24px 10px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+.moonreader-book-title {
+    margin: 0 0 4px;
+    overflow-wrap: anywhere;
+}
+.moonreader-meta {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    overflow-wrap: anywhere;
+}
+.moonreader-preview-range,
+.moonreader-destination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.moonreader-preview-range {
+    flex-wrap: wrap;
+}
+.moonreader-preview-status:empty,
+.moonreader-sort-feedback:empty {
+    display: none;
+}
+.moonreader-sort-feedback {
+    margin-top: 6px;
+}
+.moonreader-preview-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+.moonreader-preview-controls label {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+.moonreader-preview-controls select {
+    max-width: 100%;
+}
+.moonreader-preview-range button,
+.moonreader-preview-controls > button {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-s);
+    box-shadow: none;
+    color: var(--text-muted);
+    height: auto;
+    padding: 3px 8px;
+    font-size: var(--font-ui-small);
+}
+.moonreader-preview-range button:hover,
+.moonreader-preview-controls > button:hover,
+.moonreader-preview-controls > button[data-open="true"] {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+.moonreader-preview-controls > button {
+    margin-left: auto;
+}
+.moonreader-preview-controls > button[data-dirty="true"] {
+    color: var(--text-warning);
+}
+.moonreader-reading-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 16px 24px 24px;
+}
+.moonreader-warning {
+    color: var(--text-warning);
+    font-size: var(--font-ui-small);
+    margin: 0 0 12px;
+}
+.moonreader-warning:empty {
+    display: none;
+}
+.moonreader-template-details {
+    margin: 0 0 18px;
+    padding: 14px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    background: var(--background-secondary);
+}
+.moonreader-template-textarea {
+    width: 100%;
+    min-height: 110px;
+    resize: vertical;
+    font-family: var(--font-monospace);
+}
+.moonreader-field-hint {
+    margin: 10px 0 6px;
+}
+.moonreader-fields {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+.moonreader-fields button {
+    height: auto;
+    padding: 5px 8px;
+    gap: 6px;
+    font-size: var(--font-ui-smaller);
+    box-shadow: none;
+}
+.moonreader-fields button span {
+    color: var(--text-muted);
+}
+.moonreader-fields code {
+    font-size: inherit;
+}
+.moonreader-template-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.moonreader-template-status {
+    margin-top: 6px;
+}
+.moonreader-template-status:empty {
+    display: none;
+}
+.moonreader-preview {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    padding: 12px 16px;
+    overflow-wrap: anywhere;
+    margin: 12px 0;
+}
+.moonreader-book-preview {
+    border: 0;
+    padding: 0;
+    margin: 0;
+}
+.moonreader-preview > :first-child,
+.moonreader-preview .markdown-rendered > :first-child {
+    margin-top: 0;
+}
+@keyframes moonreader-fade-in {
+    from { opacity: 0.45; }
+    to { opacity: 1; }
+}
+.moonreader-book-preview .markdown-rendered {
+    animation: moonreader-fade-in 140ms ease-out;
+}
+.moonreader-preview-more {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 10px 14px;
+    border: 1px dashed var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    background: var(--background-secondary);
+}
+.moonreader-preview-more button {
+    height: auto;
+    padding: 4px 10px;
+    font-size: var(--font-ui-small);
+}
+.moonreader-empty {
+    flex: 1;
+    overflow-y: auto;
+    padding: 50px 24px;
+    text-align: center;
+    color: var(--text-muted);
+}
 
-.moonreader-library .moonreader-switch-book { display: none; }
-.moonreader-preview-range, .moonreader-destination { display: flex; align-items: center; gap: 8px; }
-.moonreader-preview-range button, .moonreader-preview-controls > button, .moonreader-destination button { background: transparent; border: 0; box-shadow: none; color: var(--text-accent); }
-.moonreader-preview-controls > button { margin-left: auto; }
-.moonreader-preview-toolbar { border-bottom: 1px solid var(--background-modifier-border); }
-.moonreader-preview-controls label { color: var(--text-muted); font-size: var(--font-ui-small); }
-.moonreader-destination .moonreader-meta { flex-shrink: 0; margin: 0; }
-.moonreader-destination button { min-width: 0; max-width: 100%; text-align: left; }
-.moonreader-library .moonreader-book-item[aria-selected="true"] { box-shadow: inset 3px 0 var(--interactive-accent); }
-.moonreader-saved-connection > summary { padding: 10px 0; overflow-wrap: anywhere; }
-.moonreader-source-info { max-height: 40vh; overflow: auto; }
-.moonreader-confirmation .mod-warning { background: var(--background-modifier-error); color: var(--text-normal); }
+/* Import footer & confirmation */
+.moonreader-footer {
+    flex-shrink: 0;
+    padding-top: 14px;
+}
+.moonreader-import-feedback {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.moonreader-import-feedback .moonreader-status {
+    flex: 1;
+    font-size: var(--font-ui-small);
+}
+.moonreader-import-feedback .moonreader-status:empty {
+    display: none;
+}
+.moonreader-import-feedback .moonreader-status:not(:empty),
+.moonreader-import-feedback button:not([hidden]) {
+    margin-bottom: 10px;
+}
+.moonreader-confirmation {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    padding: 12px;
+    margin-bottom: 12px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.moonreader-confirmation p {
+    margin: 0 auto 0 0;
+    font-size: var(--font-ui-small);
+}
+.moonreader-confirmation .mod-warning {
+    background: var(--background-modifier-error);
+    color: var(--text-normal);
+}
+.moonreader-confirmation[hidden],
+.moonreader-library [hidden],
+.moonreader-settings [hidden] {
+    display: none;
+}
+.moonreader-import-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.moonreader-destination {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-ui-small);
+    overflow-wrap: anywhere;
+}
+.moonreader-destination .moonreader-meta {
+    flex-shrink: 0;
+    margin: 0;
+}
+.moonreader-destination button {
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    padding: 4px 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-secondary);
+    box-shadow: none;
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.moonreader-destination button:hover {
+    background: var(--background-modifier-hover);
+    border-color: var(--background-modifier-border-hover);
+}
+.moonreader-status {
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+/* Settings & connection card */
+.moonreader-connection {
+    width: min(760px, 94vw);
+}
+.moonreader-connection-group {
+    container: moonreader-connection / inline-size;
+}
+.moonreader-connection-card {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(160px, 1fr);
+    gap: 18px;
+    padding: 18px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    background: var(--background-primary);
+}
+@container moonreader-connection (max-width: 520px) {
+    .moonreader-connection-card {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+.moonreader-settings .moonreader-connection-card > .setting-item:not(.setting-item-heading),
+.moonreader-settings .moonreader-connection-card > .setting-item + .setting-item {
+    border: 0;
+    border-top: 0;
+    padding: 0;
+    margin: 0;
+}
+.moonreader-saved-connection > summary {
+    padding: 10px 0;
+    overflow-wrap: anywhere;
+}
+.moonreader-connection-field {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+}
+.moonreader-connection-field .setting-item-info {
+    flex: 1;
+    min-width: 0;
+    margin-right: 0;
+}
+.moonreader-connection-field .setting-item-control {
+    width: 100%;
+    flex: 0 0 auto;
+}
+.moonreader-connection-card .moonreader-connection-field input[type="text"],
+.moonreader-connection-card .moonreader-new-password input[type="text"],
+.moonreader-connection-card .moonreader-new-password input[type="password"] {
+    width: 100%;
+}
+.moonreader-connection-card .moonreader-connection-url,
+.moonreader-connection-card .moonreader-keychain,
+.moonreader-connection-card .moonreader-connection-actions {
+    grid-column: 1 / -1;
+}
+.moonreader-connection-card .moonreader-credential-controls {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+}
+.moonreader-settings .moonreader-connection-card > .setting-item.moonreader-keychain {
+    padding-top: 16px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+.moonreader-settings .moonreader-connection-card > .setting-item.moonreader-connection-actions {
+    padding-top: 14px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+.moonreader-connection-card .moonreader-connection-actions .setting-item-info,
+.moonreader-back-to-library .setting-item-info {
+    display: none;
+}
+.moonreader-connection-card .moonreader-connection-actions .setting-item-control {
+    width: 100%;
+    gap: 8px;
+    justify-content: flex-end;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+.moonreader-connection-card .moonreader-connection-actions .moonreader-status {
+    order: -1;
+    flex-basis: 100%;
+    text-align: left;
+    margin: 0 0 4px;
+}
+.moonreader-settings .moonreader-status {
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+    margin: 12px 0;
+}
+.moonreader-connection-card .moonreader-status[data-state="dirty"],
+.moonreader-settings .moonreader-status[data-state="tested"] {
+    color: var(--text-warning);
+}
+.moonreader-connection-card .moonreader-status[data-state="error"] {
+    color: var(--text-error);
+}
+.moonreader-keychain {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+}
+.moonreader-keychain .setting-item-control {
+    width: 100%;
+    justify-content: flex-start;
+}
+.moonreader-credential-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    text-align: left;
+}
+.moonreader-credential {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+.moonreader-credential-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: var(--font-ui-small);
+}
+.moonreader-credential-name {
+    overflow-wrap: anywhere;
+    white-space: normal;
+    font-size: var(--font-ui-smaller);
+}
+.moonreader-existing-credential {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 8px;
+}
+.moonreader-saved-label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: min(100%, 220px);
+    font-size: var(--font-ui-small);
+}
+.moonreader-existing-credential select {
+    width: 100%;
+    min-width: min(100%, 220px);
+    max-width: 100%;
+}
+.moonreader-selection-hint {
+    flex-basis: 100%;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+.moonreader-selection-hint[data-empty="true"] {
+    flex-basis: auto;
+    order: -1;
+}
+.moonreader-credential-warning {
+    color: var(--text-warning);
+    font-size: var(--font-ui-small);
+}
+.moonreader-new-password {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+.moonreader-new-password label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: var(--font-ui-small);
+    width: 100%;
+}
+.moonreader-new-password input {
+    width: 100%;
+}
+.moonreader-new-password input[aria-invalid="true"] {
+    border-color: var(--text-error);
+}
+.moonreader-credential-help {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    text-align: left;
+}
+.moonreader-credential-name-error {
+    color: var(--text-error);
+    font-size: var(--font-ui-small);
+    text-align: left;
+}
+.moonreader-credential-name-error:empty {
+    display: none;
+}
+.moonreader-test-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+.moonreader-test-hint {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+.moonreader-preference-feedback {
+    margin-top: 6px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+.moonreader-preference-feedback:empty {
+    display: none;
+}
+.moonreader-connection-status {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+.moonreader-settings input[type="text"],
+.moonreader-settings input[type="password"] {
+    width: min(320px, 100%);
+}
+.moonreader-template-setting {
+    flex-direction: column;
+    align-items: stretch;
+}
+.moonreader-template-setting .setting-item-control {
+    display: block;
+    text-align: left;
+}
+.moonreader-settings-template {
+    margin-top: 8px;
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+}
+.moonreader-settings-template[open] summary {
+    margin-bottom: 16px;
+}
+.moonreader-settings-template > button {
+    display: block;
+    margin-left: auto;
+}
+.moonreader-settings summary,
+.moonreader-library summary {
+    cursor: pointer;
+}
+
+/* Narrow viewport */
 @media (max-width: 650px) {
-    .moonreader-library .moonreader-switch-book { display: block; width: 100%; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+    .moonreader-library {
+        height: min(760px, 86vh);
+    }
+    .moonreader-workspace {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-height: 250px;
+    }
+    .moonreader-library .moonreader-switch-book {
+        display: block;
+        width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: left;
+    }
     .moonreader-workspace[data-picker="closed"] .moonreader-sidebar,
-    .moonreader-workspace[data-picker="open"] .moonreader-reading { display: none; }
-    .moonreader-workspace .moonreader-sidebar { min-height: 0; }
-    .moonreader-import-actions .moonreader-destination button { margin-left: 0; }
+    .moonreader-workspace[data-picker="open"] .moonreader-reading {
+        display: none;
+    }
+    .moonreader-workspace .moonreader-sidebar {
+        min-height: 0;
+        border-right: 0;
+        border-bottom: 1px solid var(--background-modifier-border);
+    }
+    .moonreader-preview-toolbar {
+        padding: 12px 16px 8px;
+    }
+    .moonreader-reading-body {
+        padding: 12px 16px 16px;
+    }
+    .moonreader-import-actions {
+        flex-wrap: wrap;
+    }
+    .moonreader-destination {
+        flex-basis: 100%;
+    }
+    .moonreader-import-actions button:first-of-type {
+        margin-left: auto;
+    }
+    .moonreader-import-actions .moonreader-destination button {
+        margin-left: 0;
+    }
+    .moonreader-confirmation {
+        flex-wrap: wrap;
+    }
+    .moonreader-confirmation p {
+        flex-basis: 100%;
+    }
+    .moonreader-settings .setting-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    .moonreader-settings .setting-item-control {
+        justify-content: flex-start;
+    }
+    .moonreader-settings input[type="text"],
+    .moonreader-settings input[type="password"] {
+        width: 100%;
+    }
 }

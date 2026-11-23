@@ -28,27 +28,32 @@ Source code archives are not built plugin packages. When updating, replace only 
 
 ### Connect your backup
 
-Back up annotations to WebDAV from Moon+ Reader and locate the folder containing `.an` files.
+In Moon+ Reader, enable WebDAV backup/sync for reading positions and annotations, and locate the folder containing `.an` files (for example, Jianguoyun typically uses `https://dav.jianguoyun.com/dav/Books/.Notes/` with an app password rather than your account login password; `.Notes` may be a hidden folder).
 
 1. In the plugin settings, enter the **WebDAV folder URL** and **Username**.
 2. Choose an entry from **Saved Keychains**, or select **New Keychain** and enter a name and password or app password.
 3. Optionally select **Test connection**; testing does not save anything. Apply the connection with **Verify and save connection**, or **Create Keychain and save connection** for a new entry.
-4. Open the library from the ribbon button or the **Browse and import notes** command. Each time the plugin starts, the first library open shows the saved books immediately and checks the configured backup in the background. Reopening the library uses that result, including an empty folder or a failed check. Use **Refresh** or **Retry** to check again. Select the server name to inspect the backup folder, last check time and reasons for individual failures. If a background check removes the selected book, select another book before importing. Checks that leave the cached books unchanged save only a small timestamp record.
+4. Open the library from the ribbon button or the **Browse and import notes** command.
 
 Keychain names accept lowercase letters, numbers and dashes, up to 64 characters. Existing names cannot be overwritten. Changing the account or server requires choosing a credential again. Manage existing entries in Obsidian Keychain.
 
-Each WebDAV request times out after 30 seconds, including folder listings and annotation downloads during refresh. Connection checks can also be cancelled. Closing settings discards drafts and cancels saves that have not started writing; a save already writing finishes and switches the library to the new connection.
+#### Refresh and cache behavior
+
+- Each time the plugin starts, the first library open shows cached books immediately and checks the configured backup in the background. Reopening the library reuses that result; use **Refresh** or **Retry** to check again.
+- Select the server name in the top bar to inspect the backup folder, last check time, and per-book failure reasons. Press **Escape** or click outside to close the details popover.
+- If a background check removes the currently selected book, select another book before importing. Checks that leave cached books unchanged save only a small timestamp record.
+- Each WebDAV request times out after 30 seconds. Connection checks can be cancelled; closing settings discards drafts and cancels saves that have not started writing, while an in-flight commit finishes and switches the library to the new connection.
 
 ### Import notes
 
-Choose the default book and note orders in settings. Changing either order in the library also saves that preference. Notes can follow backup order, chapter number, or annotation time in either direction for chapters and times. Ties retain backup order, and missing times appear last when sorting by time.
+Choose the default book and note orders in settings. Changing either order in the library also saves that preference. Notes can follow backup order, chapter and reading position (`offset`, with legacy cached notes falling back to backup order), or annotation time in either direction. Missing times appear last when sorting by time.
 
-Select a book to preview its first three sorted annotations. Choose **Preview all** to expand the full preview. Use the preview toolbar to change order, show the first three again, or adjust the template. After changing order or template, wait for the updated preview before importing. The import button writes **all annotations** from that book; the footer shows the destination and insertion mode.
+Select a book to preview its first three sorted annotations. Choose **Preview all** to expand the full preview. Use the fixed preview toolbar to change order, show the first three again, or adjust the template. After changing order or template, wait for the updated preview before importing. The import button writes **all annotations** from that book; the footer shows the destination and insertion mode.
 
 - The default inserts at the cursor captured when the panel opened, without replacing selected text. If another pane has focus, it uses the most recent Markdown note still open.
-- With no open destination, use **Choose note**, select a Markdown file, then append.
-- Click the destination path to change files. The adjacent mode menu selects cursor insertion, append, or replacement. In a narrow window, use **Switch book** to reopen the list. Replacement requires confirmation and preserves leading YAML properties.
-- Arrow keys select books, Enter focuses the import button, and Ctrl/Cmd+Enter imports. Shortcuts cannot bypass confirmation.
+- With no open destination, use **Choose note** to select an existing Markdown file or create a new note directly from the picker (defaulting to the selected book title), then append.
+- Click the destination path to change files or create a new note. The adjacent mode menu selects cursor insertion, append, or replacement. In a narrow window, use **Switch book** to reopen the list. Replacement requires confirmation and preserves leading YAML properties.
+- Arrow keys select books, Enter focuses the import button, and Ctrl/Cmd+Enter imports (disabled while typing inside the template editor). Shortcuts cannot bypass confirmation.
 
 Importing the same book into the same note again requires confirmation during one plugin session. **There is no deduplication across sessions or two-way sync**; repeated imports may duplicate content and block IDs. Remote backups are never modified. Closing during a write waits for it to finish.
 
@@ -60,7 +65,15 @@ Use the list's order button to sort by title or backup modification time in eith
 
 ## Templates
 
-Use **Adjust template** in the library for the current import. Select **Save as default template** to reuse it; the default is also editable in plugin settings.
+Use **Adjust template** in the library for the current import; unsaved changes are marked on the toggle button and can be reverted with **Reset to default** or saved with **Save as default template**. The default template is also editable in plugin settings.
+
+Default template:
+
+```markdown
+> {highlightText} ^{id}
+{#note}> <span style="color: {color}">{note}</span>
+{/note}
+```
 
 | Field | Value |
 | --- | --- |
@@ -72,7 +85,9 @@ Use **Adjust template** in the library for the current import. Select **Save as 
 | `{timestamp}` | UTC time |
 | `{id}` | Original annotation ID |
 
-Templates support Markdown and HTML. Field values are HTML-escaped; preview and import use the same template.
+- **Conditional blocks:** Wrap optional sections with `{#field}...{/field}` (for example `{#note}...{/note}`) to render them only when that field is non-empty.
+- **Line breaks & spacing:** Moon+ Reader `<BR>` markers in highlights and notes are converted to line breaks (preserving blockquote `>` prefixes on blockquote lines, or `<br>` inside inline HTML tags such as `<span>`). If a rendered note does not end with a newline and the next note does not start with one, a blank line (`\n\n`) is inserted automatically between entries so Markdown blocks such as `>` do not merge into the previous line.
+- **Escaping:** Templates support Markdown and HTML. Field values are HTML-escaped, and preview and import always use the same template.
 
 ## Data and privacy
 
@@ -88,6 +103,10 @@ Book caches are plain text in the plugin folder, separated by server directory a
 - **The original note closed or changed:** Switch to appending, or open the target note and reopen the library to capture a new cursor position.
 
 Report problems through [GitHub Issues](https://github.com/seeyou2n1ght/obsidian-MoonReaderNoteSync/issues).
+
+## Development
+
+Requires Node.js 22+ and targets Obsidian desktop 1.13.0+. Run `npm run check` to execute TypeScript type checking, ESLint (`eslint-plugin-obsidianmd`), unit/integration/layout tests, production bundling (`main.js`), and bundle verification.
 
 ## License
 

@@ -42,11 +42,13 @@ export class WebDAVClient {
             timer = window.setTimeout(() => reject(new UserError(t('WebDAV 请求超时，请检查服务器后重试。', 'WebDAV request timed out. Check the server and retry.'))), this.timeoutMs);
         });
         try {
-            // requestUrl has no abort API; stop waiting and discard its late response.
-            const response = await Promise.race([requestUrl({ url, method, throw: false, headers: {
+            // requestUrl has no abort API; stop waiting and discard its late response or rejection.
+            const pending = requestUrl({ url, method, throw: false, headers: {
                 Authorization: 'Basic ' + Buffer.from(this.username + ':' + password).toString('base64'),
                 ...(method === 'PROPFIND' ? { Depth: '1' } : {})
-            } }), interruption]);
+            } });
+            pending.catch(() => {});
+            const response = await Promise.race([pending, interruption]);
             if (response.status < 200 || response.status >= 300) throw Object.assign(new Error('WebDAV request failed'), { status: response.status });
             return response;
         } finally {
@@ -61,17 +63,19 @@ export class WebDAVClient {
         if (doc.getElementsByTagNameNS('*', 'parsererror').length || doc.documentElement.localName !== 'multistatus' || doc.documentElement.namespaceURI !== 'DAV:') {
             throw new UserError(t('服务器目录响应无法解析。旧缓存已保留。', 'Cannot parse the server listing. The previous cache is preserved.'));
         }
-        const text = (el: Element, name: string) => el.getElementsByTagNameNS('DAV:', name)[0]?.textContent || '';
+        const directChildren = (el: Element, name: string) =>
+            Array.from(el.children).filter(child => child.namespaceURI === 'DAV:' && child.localName === name);
+        const childText = (el: Element, name: string) => directChildren(el, name)[0]?.textContent || '';
         const files = new Map<string, WebDAVFile>();
         for (const res of Array.from(doc.documentElement.children).filter(el => el.localName === 'response')) {
             if (res.namespaceURI !== 'DAV:') throw new UserError(t('目录包含无法识别的文件响应。旧缓存已保留。', 'The listing contains an unrecognized file response. The previous cache is preserved.'));
-            const href = text(res, 'href');
+            const href = childText(res, 'href');
             if (!href) throw new Error('Missing WebDAV href');
-            const props = Array.from(res.getElementsByTagNameNS('DAV:', 'propstat'))
-                .filter(p => /\s200(?:\s|$)/.test(text(p, 'status')))
-                .map(p => p.getElementsByTagNameNS('DAV:', 'prop')[0]).filter(Boolean);
+            const props = directChildren(res, 'propstat')
+                .filter(p => /\s200(?:\s|$)/.test(childText(p, 'status')))
+                .flatMap(p => directChildren(p, 'prop'));
             if (!props.length) throw new UserError(t('部分文件元数据不可读。旧缓存已保留，请检查目录权限后重试。', 'Some file metadata is unavailable. The previous cache is preserved. Check folder permissions and retry.'));
-            const property = (name: string) => props.map(p => text(p, name)).find(Boolean) || '';
+            const property = (name: string) => props.map(p => childText(p, name)).find(Boolean) || '';
             const length = property('getcontentlength');
             const modified = property('getlastmodified');
             const file: WebDAVFile = {

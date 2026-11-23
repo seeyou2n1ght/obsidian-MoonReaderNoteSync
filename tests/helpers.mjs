@@ -48,8 +48,8 @@ export async function harness(t) {
     const vault = join(root, 'vault');
     const dir = '.obsidian/plugins/obsidian-moonreader-sync';
     await fs.mkdir(join(vault, dir), { recursive: true });
-    const target = { path: 'Target.md', basename: 'Target' };
-    const other = { path: 'Other.md', basename: 'Other' };
+    const target = Object.assign(new host.TFile(), { path: 'Target.md', basename: 'Target' });
+    const other = Object.assign(new host.TFile(), { path: 'Other.md', basename: 'Other' });
     const files = new Map([[target, '---\ntitle: test\n---\nOriginal body.\n'], [other, 'Other original.\n']]);
     const state = { writes: 0, failWrite: false, beforeWrite: null, saves: 0, beforeSave: null };
     const secrets = new Map();
@@ -62,6 +62,12 @@ export async function harness(t) {
         adapter: new FileSystemAdapter(vault),
         getMarkdownFiles: () => [...files.keys()],
         getAbstractFileByPath: path => [...files.keys()].find(f => f.path === path),
+        create: async (path, content) => {
+            if ([...files.keys()].some(f => f.path === path)) throw new Error('File already exists');
+            const created = Object.assign(new host.TFile(), { path, basename: path.replace(/\.md$/i, '').split('/').pop() });
+            files.set(created, content);
+            return created;
+        },
         process: async (file, callback) => {
             if (state.beforeWrite) await state.beforeWrite();
             if (state.failWrite) throw new Error('Controlled disk failure');

@@ -20,7 +20,8 @@ export class NotePreview extends Component {
             if (revision !== this.revision) return false;
             this.el.replaceChildren(staging);
             return true;
-        } catch {
+        } catch (error) {
+            console.error('[MoonReader Note Sync] Preview render failed:', error);
             if (revision === this.revision) this.el.setText(t('预览失败，请检查模板。', 'Preview failed. Check the template.'));
             return false;
         }
@@ -32,7 +33,13 @@ export class TemplateBuilderUI {
     static build(container: HTMLElement, initial: string, onChange: (value: string) => void) {
         const editor = container.createEl('textarea', { cls: 'moonreader-template-textarea', attr: { 'aria-label': t('笔记模板', 'Note template'), spellcheck: 'false' } });
         editor.value = initial;
-        container.createDiv({ cls: 'moonreader-meta moonreader-field-hint', text: t('可用字段 · 点击插入到光标处', 'Available fields · Click to insert at the cursor') });
+        container.createDiv({
+            cls: 'moonreader-meta moonreader-field-hint',
+            text: t(
+                '可用字段 · 点击插入到光标处；支持 {#note}…{/note} 在字段非空时显示',
+                'Available fields · Click to insert at the cursor; wrap with {#note}…{/note} to show only when non-empty'
+            )
+        });
         const fields = container.createDiv({ cls: 'moonreader-fields' });
         const insert = (value: string) => {
             editor.setRangeText(value, editor.selectionStart, editor.selectionEnd, 'end');
@@ -52,10 +59,44 @@ export class TemplateBuilderUI {
             button.addEventListener('click', () => insert(value));
             button.addEventListener('dragstart', event => event.dataTransfer?.setData('text/plain', value));
         }
+        const conditional = fields.createEl('button', { attr: {
+            type: 'button',
+            title: t('有批注时显示 · 点击插入或包裹选中文本', 'Show only when note is non-empty · Click to insert or wrap selection'),
+            'aria-label': t('有批注时显示 {#note}…{/note}', 'Conditional note {#note}…{/note}')
+        } });
+        conditional.createEl('code', { text: '{#note}' });
+        conditional.createSpan({ text: t('有批注时显示', 'If note') });
+        conditional.draggable = true;
+        conditional.addEventListener('click', () => {
+            const selected = editor.value.slice(editor.selectionStart, editor.selectionEnd);
+            insert(selected ? '{#note}' + selected + '{/note}' : '{#note}{note}{/note}');
+        });
+        conditional.addEventListener('dragstart', event => event.dataTransfer?.setData('text/plain', '{#note}{note}{/note}'));
         editor.addEventListener('input', () => onChange(editor.value));
         return editor;
     }
     static sample(): MoonReaderNote[] {
-        return [{ id: '12345678', bookName: t('阅读示例', 'Reading example'), chapter: '4', highlightText: t('这是书中的一段高亮。', 'A highlighted passage from a book.'), note: t('这是我的阅读批注。', 'My reading note.'), colorHex: '#FFEB3B', timestamp: '2026-01-01 12:00:00' }];
+        return [
+            {
+                id: '12345678',
+                bookName: t('阅读示例', 'Reading example'),
+                chapter: '4',
+                offset: 120,
+                highlightText: t('这是书中的第一段高亮。', 'First highlighted passage from a book.'),
+                note: t('这是我的阅读批注。', 'My reading note.'),
+                colorHex: '#FFEB3B',
+                timestamp: '2026-01-01 12:00:00'
+            },
+            {
+                id: '12345679',
+                bookName: t('阅读示例', 'Reading example'),
+                chapter: '4',
+                offset: 280,
+                highlightText: t('这是一条没有批注的纯高亮。', 'A highlight without a personal note.'),
+                note: '',
+                colorHex: '#FFEB3B',
+                timestamp: '2026-01-01 12:05:00'
+            }
+        ];
     }
 }

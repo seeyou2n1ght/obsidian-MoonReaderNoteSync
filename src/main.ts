@@ -5,7 +5,6 @@ import { WebDAVClient, normalizeWebDavUrl } from './utils/webdav';
 import { BookSuggestModal } from './ui/bookSuggestModal';
 import { randomUUID } from 'crypto';
 import { BookCache, readCache, writeCache, readCheckTime, writeCheckTime, sourceId } from './utils/cache';
-import { renderNotes } from './utils/notes';
 import { syncBooks } from './utils/sync';
 import { t, errorMessage, UserError } from './i18n';
 
@@ -32,8 +31,8 @@ export default class MoonReaderSyncPlugin extends Plugin {
     private settingsTab!: MoonReaderWebDAVSettingTab;
     private browser: BookSuggestModal | null = null;
     private connectionModal: Modal | null = null;
+    private refreshController: AbortController | null = null;
     private disposed = false;
-    renderNotes = renderNotes;
 
     async onload() {
         const raw: unknown = await this.loadData();
@@ -62,6 +61,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
     }
     onunload() {
         this.disposed = true;
+        this.refreshController?.abort();
         this.browser?.close();
         this.connectionModal?.close();
         this.settingsTab.hide();
@@ -170,6 +170,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
     }
     private async loadSavedConnection() {
         // A verified replacement can repair a password without changing the keychain entry name.
+        this.refreshController?.abort();
         this.checkedSource = '';
         await this.loadCache();
     }
@@ -177,7 +178,9 @@ export default class MoonReaderSyncPlugin extends Plugin {
         return sourceId(normalizeWebDavUrl(this.settings.webDavUrl), this.settings.username);
     }
     private cachePath(source?: string): string {
-        return normalizePath(this.manifest.dir! + '/' + (source ? 'moonreader_cache.' + source + '.json' : 'moonreader_cache.json'));
+        const dir = this.manifest.dir;
+        if (!dir) throw new Error('Plugin directory unavailable');
+        return normalizePath(dir + '/' + (source ? 'moonreader_cache.' + source + '.json' : 'moonreader_cache.json'));
     }
     async loadCache() {
         this.lastChecked = '';
@@ -201,7 +204,8 @@ export default class MoonReaderSyncPlugin extends Plugin {
                 try { this.lastChecked = await readCheckTime(this.app.vault.adapter, this.cachePath(source), this.lastChecked); }
                 catch { this.status += t(' · 最近检查记录不可读，显示缓存保存时间', ' · Last check record unavailable; showing cache save time'); }
             }
-        } catch {
+        } catch (error) {
+            console.error('[MoonReader Note Sync] Failed to load local cache:', error);
             this.cache = { version: 1, source: '', checkedAt: '', books: [] };
             this.libraryPhase = 'error';
             this.librarySummary = t('本地缓存无法读取', 'Cannot read local cache');
@@ -268,7 +272,9 @@ export default class MoonReaderSyncPlugin extends Plugin {
         }
         const connection = this.connectionKey();
         this.checkedSource = connection;
-        const stale = () => this.disposed || connection !== this.connectionKey();
+        const controller = new AbortController();
+        this.refreshController = controller;
+        const stale = () => this.disposed || controller.signal.aborted || connection !== this.connectionKey();
         let savingCache = false;
         this.libraryPhase = 'checking';
         this.checkProgress = null;
@@ -281,7 +287,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
             const password = this.app.secretStorage.getSecret(settings.secretId);
             if (!password) throw new UserError(t('已保存的密码不可用，请重新输入并保存。', 'Saved password unavailable; re-enter and save it.'));
             let lastProgress = -Infinity;
-            const result = await syncBooks(new WebDAVClient(settings.webDavUrl, settings.username, password),
+            const result = await syncBooks(new WebDAVClient(settings.webDavUrl, settings.username, password, controller.signal),
                 this.cache.source === source ? this.cache.books : [], (done, total) => {
                     if (stale()) return;
                     const now = performance.now();
@@ -325,6 +331,7 @@ export default class MoonReaderSyncPlugin extends Plugin {
             this.librarySummary = savingCache ? t('本地缓存保存失败', 'Could not save local cache') : t('远端检查失败', 'Remote check failed');
             this.status = errorMessage(error) + ' ' + t('已有缓存仍可浏览和导入。', 'Existing cached books remain available.');
         } finally {
+            if (this.refreshController === controller) this.refreshController = null;
             this.syncing = false;
             this.checkProgress = null;
             this.notify();

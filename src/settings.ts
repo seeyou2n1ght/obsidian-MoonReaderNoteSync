@@ -30,5 +30,5 @@ export const DEFAULT_SETTINGS: MoonReaderSyncSettings = {
     
     insertAction: "ask",
     
-    noteTemplate: '> {highlightText} ^{id}\n> <span style="color: {color}">{note}</span>\n\n'
+    noteTemplate: '> {highlightText} ^{id}\n{#note}> <span style="color: {color}">{note}</span>\n{/note}\n'
 }

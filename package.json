@@ -1,6 +1,6 @@
 {
   "name": "ob-moonreadernotesync",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Import Moon+ Reader highlights and annotations from WebDAV backups into your notes.",
   "private": true,
   "main": "main.js",
@@ -8,8 +8,9 @@
     "dev": "node esbuild.config.mjs",
     "build": "node esbuild.config.mjs production",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
     "test": "node --test tests/*.test.mjs",
-    "check": "npm run typecheck && npm test && npm run build && npm run check:bundle",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build && npm run check:bundle",
     "check:bundle": "node tests/verify-build.mjs",
     "check:release": "node tests/verify-build.mjs --tag"
   },
@@ -26,10 +27,13 @@
     "@types/node": "^25.9.1",
     "@types/pako": "^2.0.4",
     "esbuild": "^0.28.2",
+    "eslint": "^9.39.5",
+    "eslint-plugin-obsidianmd": "^0.6.0",
     "jsdom": "^26.1.0",
+    "marked": "^18.2.1",
     "obsidian": "^1.13.1",
     "pako": "^2.1.0",
-    "tslib": "^2.8.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.74.0"
   }
 }

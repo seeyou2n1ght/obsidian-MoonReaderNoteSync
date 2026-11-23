@@ -49,7 +49,7 @@ export function sortPreference(plugin: MoonReaderSyncPlugin, owner: Component, d
         } catch (error) {
             sync();
             feedback.setText(t('排序未保存，仍使用「', 'Order was not saved. Current order: ') +
-                dropdown.selectEl.selectedOptions[0].text + t('」。', '. ') + errorMessage(error));
+                (dropdown.selectEl.selectedOptions[0]?.text || current()) + t('」。', '. ') + errorMessage(error));
         } finally { sync(); dropdown.setDisabled(false); onSaving(false); }
     };
     dropdown.onChange(value => { void saveOrder(value); });

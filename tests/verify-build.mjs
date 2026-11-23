@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createRequire, isBuiltin } from 'node:module';
+import { extractReleaseNotes } from '../scripts/release-notes.mjs';
 
 const require = createRequire(import.meta.url);
 const manifest = JSON.parse(await readFile('manifest.json', 'utf8'));
@@ -21,7 +22,7 @@ assert.ok(!pkg.devDependencies['builtin-modules'], 'Use Node builtinModules rath
 const settingsSource = await readFile('src/ui/settingTab.ts', 'utf8');
 assert.ok(!/createEl\(['"]h[1-6]['"]/.test(settingsSource), 'Settings headings must use Setting.setHeading()');
 assert.ok(settingsSource.includes('getSettingDefinitions()'), 'Settings must support native search indexing');
-for (const path of ['src/ui/bookSuggestModal.ts', 'src/ui/templateBuilder.ts', 'src/ui/settingTab.ts']) {
+for (const path of ['src/ui/bookSuggestModal.ts', 'src/ui/connectionSection.ts', 'src/ui/fileSuggestModal.ts', 'src/ui/importPanel.ts', 'src/ui/templateBuilder.ts', 'src/ui/settingTab.ts']) {
     const source = await readFile(path, 'utf8');
     assert.ok(!source.includes('document.createElement'), 'Use native DOM helpers in ' + path);
     assert.ok(!/\.createEl\(['"](?:div|span)['"]/.test(source), 'Use createDiv/createSpan shorthand helpers in ' + path);
@@ -43,7 +44,8 @@ assert.match(manifest.id, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 assert.ok((await readFile('styles.css', 'utf8')).trim());
 assert.ok((await readFile('LICENSE', 'utf8')).trim());
 assert.ok((await readFile('README.md', 'utf8')).trim());
-assert.ok((await readFile('CHANGELOG.md', 'utf8')).split(/\r?\n/).includes('## ' + manifest.version), 'Release notes must match the version');
+const changelog = await readFile('CHANGELOG.md', 'utf8');
+assert.ok(extractReleaseNotes(changelog, manifest.version).startsWith('## ' + manifest.version), 'Release notes must match the version');
 const code = await readFile('main.js', 'utf8');
 const notices = (await readFile('THIRD-PARTY-NOTICES.txt', 'utf8')).trim();
 assert.ok(code.includes(notices), 'The bundle must include third-party license notices');

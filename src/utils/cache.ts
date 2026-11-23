@@ -10,7 +10,9 @@ export function isBook(value: unknown): value is BookItem {
     if (!value || typeof value !== 'object') return false;
     const b = value as BookItem;
     return typeof b.fileHref === 'string' && typeof b.bookName === 'string' && Array.isArray(b.notes) &&
-        b.notes.every(n => n && typeof n === 'object' && !('originalPath' in n) && ['id', 'bookName', 'chapter', 'colorHex', 'timestamp', 'note', 'highlightText'].every(k => typeof (n as unknown as Record<string, unknown>)[k] === 'string'));
+        b.notes.every(n => n && typeof n === 'object' && !('originalPath' in n) &&
+            (!('offset' in n) || (typeof (n as { offset?: unknown }).offset === 'number' && Number.isFinite((n as { offset: number }).offset))) &&
+            ['id', 'bookName', 'chapter', 'colorHex', 'timestamp', 'note', 'highlightText'].every(k => typeof (n as unknown as Record<string, unknown>)[k] === 'string'));
 }
 // Files in the plugin config directory are not indexed as TFiles; use the vault adapter.
 type CacheStorage = Pick<DataAdapter, 'exists' | 'read' | 'write' | 'rename' | 'remove'>;
