@@ -21,17 +21,47 @@ function findChromium() {
     return candidates.find(path => existsSync(path)) || null;
 }
 
-async function waitForDebugger(port) {
-    for (let i = 0; i < 60; i++) {
+function waitForListeningPort(proc, timeoutMs = 20_000) {
+    return new Promise((resolve, reject) => {
+        let stderr = '';
+        let settled = false;
+        const finish = (fn, value) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            fn(value);
+        };
+        const timer = setTimeout(() => {
+            finish(reject, new Error('Timed out waiting for headless Chrome DevTools port. stderr:\n' + stderr.slice(-1000)));
+        }, timeoutMs);
+        proc.stderr.on('data', chunk => {
+            stderr += String(chunk);
+            const match = stderr.match(/DevTools listening on ws:\/\/(\[[^\]]+\]|[^:/]+):(\d+)\//);
+            if (match) finish(resolve, { host: match[1], port: Number(match[2]) });
+        });
+        proc.once('error', error => finish(reject, error));
+        proc.once('exit', (code, signal) => {
+            finish(reject, new Error(`Headless Chrome exited early (code=${code}, signal=${signal}). stderr:\n` + stderr.slice(-1000)));
+        });
+    });
+}
+
+async function waitForPageTarget({ host, port }) {
+    for (let i = 0; i < 40; i++) {
         try {
-            const res = await fetch(`http://127.0.0.1:${port}/json/list`);
+            const res = await fetch(`http://${host}:${port}/json/list`);
             const targets = await res.json();
             const page = targets.find(item => item.type === 'page' && item.webSocketDebuggerUrl);
             if (page) return page.webSocketDebuggerUrl;
-        } catch { /* browser still starting */ }
+            const created = await fetch(`http://${host}:${port}/json/new?about:blank`, { method: 'PUT' });
+            if (created.ok) {
+                const target = await created.json();
+                if (target.webSocketDebuggerUrl) return target.webSocketDebuggerUrl;
+            }
+        } catch { /* endpoint still warming up */ }
         await new Promise(resolve => setTimeout(resolve, 100));
     }
-    throw new Error('Timed out waiting for headless Chrome DevTools endpoint');
+    throw new Error('Timed out waiting for headless Chrome page target');
 }
 
 async function openCdp(wsUrl) {
@@ -68,15 +98,24 @@ test('CSS layout keeps modal height fixed on preview expand, clips scroll below 
     if (!browserPath) { t.skip('No Chromium binary found'); return; }
     const styles = await readFile('styles.css', 'utf8');
     const profileDir = await mkdtemp(join(tmpdir(), 'moonreader-layout-'));
-    const port = 9300 + Math.floor(Math.random() * 600);
     const proc = spawn(browserPath, [
         '--headless=new',
         '--disable-gpu',
         '--no-sandbox',
-        `--remote-debugging-port=${port}`,
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--disable-extensions',
+        '--disable-background-networking',
+        '--disable-sync',
+        '--metrics-recording-only',
+        '--mute-audio',
+        '--remote-debugging-address=127.0.0.1',
+        '--remote-debugging-port=0',
         `--user-data-dir=${profileDir}`,
         'about:blank'
-    ], { stdio: 'ignore' });
+    ], { stdio: ['ignore', 'ignore', 'pipe'] });
     let cdp = null;
     t.after(async () => {
         cdp?.close();
@@ -85,7 +124,8 @@ test('CSS layout keeps modal height fixed on preview expand, clips scroll below 
         await rm(profileDir, { recursive: true, force: true });
     });
 
-    const wsUrl = await waitForDebugger(port);
+    const endpoint = await waitForListeningPort(proc);
+    const wsUrl = await waitForPageTarget(endpoint);
     cdp = await openCdp(wsUrl);
     await cdp.send('Page.enable');
     await cdp.send('Runtime.enable');
